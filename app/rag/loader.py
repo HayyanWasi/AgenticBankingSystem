@@ -3,20 +3,20 @@ from typing import List
 from pathlib import Path
 
 # load pdf documents from data folder
-# directory_path="../data" 
-# def load_pdf_documents(directory_path: str)-> List:
-#     dir_loader = DirectoryLoader(
-#         directory_path,
-#         glob="**/*.pdf",
-#         loader_cls=PyMuPDFLoader,
-#         show_progress=False
-#     )
+directory_path= Path(__file__).resolve().parent.parent / "data"
+def load_pdf_documents(directory_path: str)-> List:
+    dir_loader = DirectoryLoader(
+        directory_path,
+        glob="**/*.pdf",
+        loader_cls=PyMuPDFLoader,
+        show_progress=False
+    )
 
-#     pdf_documents = dir_loader.load()
-#     return pdf_documents
+    pdf_documents = dir_loader.load()
+    return pdf_documents
 
-# pdf_documents = load_pdf_documents(directory_path)
-# print(pdf_documents)
+pdf_documents = load_pdf_documents(directory_path)
+print(pdf_documents)
 
 # read the pdf documents
 def process_all_pdfs(pdf_directory):
