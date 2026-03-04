@@ -1,118 +1,62 @@
-import chromadb
+"""
+ChromaDB Vector Store — handles storage and querying of document embeddings.
+"""
+
 import os
-from chromadb.config import Settings
-from sklearn.metrics.pairwise import cosine_similarity
 import uuid
-from typing import List, Dict, Any
+import chromadb
 import numpy as np
-from .splitter import chunks
-from .embedding import embedding_manager
+from typing import List, Any
 
-
-
+from .config import COLLECTION_NAME, PERSIST_DIR
 
 
 class VectorStore:
-    """Manages documents embeddings in a ChromaDB vector store"""
+    """Manages document embeddings in a ChromaDB vector store."""
 
-    def __init__(self, collection_name: str = "pdf_documents", persist_directory: str = "../data"):
-        """Initialize the vector store
-        Args:
-            collection_name: Name of the collection
-            persist_directory: Directory to persist the collection
-        """
+    def __init__(self):
+        os.makedirs(PERSIST_DIR, exist_ok=True)
+        self.client = chromadb.PersistentClient(path=str(PERSIST_DIR))
+        self.collection = self.client.get_or_create_collection(
+            name=COLLECTION_NAME,
+            metadata={"description": "PDF document embeddings for RAG"},
+        )
+        print(f"Collection ready: {COLLECTION_NAME}")
+        print(f"Existing docs: {self.collection.count()}")
 
-        self.collection_name = collection_name
-        self.persist_directory = persist_directory
-        self.client = None
-        self.collection = None
-        self._initialize_store()
+    # ── Write ──────────────────────────────────────────
 
-
-    def _initialize_store(self):
-        """Initialize ChromaDB client and collection """
-        try:
-            os.makedirs(self.persist_directory, exist_ok=True)
-            self.client = chromadb.PersistentClient()
-
-            self.collection = self.client.get_or_create_collection(
-                name=self.collection_name,
-                metadata = {"description": "PDF document for embedding RAG"}
-                )
-            print(f"Vector store initialize collection: {self.collection_name}")
-            print(f"Existing documents in collection: {self.collection.count()}")
-
-        except Exception as e:
-            print(f"Error initializing vector store: {e}")
-            raise  
-
-    
-    def add_documents(self, documents: List[Any], embeddings: np.ndarray ):
-        """Add documents and their embeddings to vector store
-        Args:
-        documents: List of documents with metadata and embeddings
-        embeddings: Corresponding embeddings for the documents
-
-        """
+    def add_documents(self, documents: List[Any], embeddings: np.ndarray):
+        """Store document chunks and their embeddings."""
         if len(documents) != len(embeddings):
-            raise ValueError("Documents and embeddings must have the same length")
+            raise ValueError("documents and embeddings must have the same length")
 
-        print(f"Adding {len(documents)} documents to vector store")
+        ids, metas, texts, embs = [], [], [], []
 
+        for i, (doc, emb) in enumerate(zip(documents, embeddings)):
+            ids.append(f"doc_{uuid.uuid4().hex[:8]}_{i}")
 
-        # prepare data for chromadb
+            meta = dict(doc.metadata)
+            meta["doc_index"] = i
+            meta["content_length"] = len(doc.page_content)
+            metas.append(meta)
 
-        ids = []
-        metadatas = []
-        documents_text = []
-        embedding_list = []
+            texts.append(doc.page_content)
+            embs.append(emb.tolist())
 
-        for i, (doc, embedding) in enumerate(zip(documents, embeddings)):
-            #Genrate unique ids
-            doc_id = f"doc_{uuid.uuid4().hex[:8]}_{i}"
-            ids.append(doc_id)
+        self.collection.add(
+            ids=ids,
+            embeddings=embs,
+            metadatas=metas,
+            documents=texts,
+        )
+        print(f"Added {len(documents)} docs → total {self.collection.count()}")
 
-            #prepare metadata
-            metadata = dict(doc.metadata)
-            metadata['doc_index'] = i
-            metadata['content_length'] = len(doc.page_content)
-            metadatas.append(metadata)
+    # ── Read ───────────────────────────────────────────
 
-            documents_text.append(doc.page_content)
-
-            embedding_list.append(embedding.tolist())
-
-        try:
-            self.collection.add(
-                ids=ids,
-                embeddings=embedding_list,
-                metadatas=metadatas,
-                documents=documents_text
-            )
-
-            print(f"Added {len(documents)} documents to vector store")
-            print("Successfully added documents to vector store")
-            print(f"Total documents in collection: {self.collection.count()}")
-
-        except Exception as e:
-            print(f"Error adding documents to vector store: {e}")
-            raise
-            
-
-# vector_store = VectorStore()
-# print(vector_store)
-
-
-# ###Convert text into embeddings
-# text = [doc.page_content for doc in chunks]
-
-# # print(text)
-
-
-# embeddings = embedding_manager.generate_embedding(text)
-
-# #storing in database
-
-# vector_store.add_documents(chunks, embeddings)
-
-
+    def query(self, query_embedding: np.ndarray, top_k: int):
+        """Return raw ChromaDB query results."""
+        return self.collection.query(
+            query_embeddings=[query_embedding.tolist()],
+            n_results=top_k,
+        )
