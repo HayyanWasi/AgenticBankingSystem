@@ -24,7 +24,7 @@ class VectorStore:
         print(f"Collection ready: {COLLECTION_NAME}")
         print(f"Existing docs: {self.collection.count()}")
 
-    # ── Write ──────────────────────────────────────────
+
 
     def add_documents(self, documents: List[Any], embeddings: np.ndarray):
         """Store document chunks and their embeddings."""
@@ -52,7 +52,7 @@ class VectorStore:
         )
         print(f"Added {len(documents)} docs → total {self.collection.count()}")
 
-    # ── Read ───────────────────────────────────────────
+
 
     def query(self, query_embedding: np.ndarray, top_k: int):
         """Return raw ChromaDB query results."""
