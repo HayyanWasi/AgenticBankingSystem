@@ -7,9 +7,9 @@ from pathlib import Path
 
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_core.documents import Document
+from langchain_core.vectorstores import InMemoryVectorStore  
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sentence_transformers import SentenceTransformer
-from .vector_store import VectorStore
+from langchain_huggingface import HuggingFaceEmbeddings
 from .config import (
     EMBEDDING_MODEL,
     CHUNK_SIZE,
@@ -24,8 +24,14 @@ class RAG:
 
     def __init__(self):
         print(f"Loading embedding model: {EMBEDDING_MODEL}")
-        self.embedding_model = SentenceTransformer(EMBEDDING_MODEL)
-        self.vector_store = VectorStore()
+        # self.embedding_model = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)  
+        self.embedding_model = HuggingFaceEmbeddings(
+            model_name=EMBEDDING_MODEL,
+            model_kwargs={"device": "cpu"},
+            encode_kwargs={"normalize_embeddings": True}
+        )
+        self.vector_store = InMemoryVectorStore(embedding=self.embedding_model)         
+
 
 
     def ingest_pdf(self, data_path: Path = DATA_DIR) -> List[Document]:
@@ -48,14 +54,14 @@ class RAG:
 
                 # updating metadata
 
-                # page.metadata["source"] = pdf_file.name
-                # page.metadata["human_page"] = page.metadata["page"] + 1
+                page.metadata["source"] = pdf_file.name
+                page.metadata["human_page"] = page.metadata["page"] + 1
                 # page.metadata["category"] = "general"
 
                 # reading metadata
 
-                # print(f"File : {page.metadata['source']}")
-                # print(f"Page : {page.metadata['human_page']} of {page.metadata['total_pages']}")
+                print(f"File : {page.metadata['source']}")
+                print(f"Page : {page.metadata['human_page']} of {page.metadata['total_pages']}")
                 # print(f"Category: {page.metadata['category']}")
                 # print("---")
 
@@ -80,11 +86,8 @@ class RAG:
         all_splits = text_splitter.split_documents(all_docs)
         print(f"Split blog post into {len(all_splits)} sub-documents.")
         
-        texts = [doc.page_content for doc in all_splits]
-
-        embeddings = self.embedding_model.encode(texts)
         
-        document_ids = self.vector_store.add_documents(documents=all_splits, embeddings=embeddings)
+        document_ids = self.vector_store.add_documents(documents=all_splits)  
         return document_ids
 
 

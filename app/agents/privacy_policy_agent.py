@@ -1,36 +1,29 @@
+# pip install -qU langchain "langchain[anthropic]"
+import os
+from langchain.agents import create_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
-from app.rag.pipeline import rag_pipeline
+load_dotenv()
 
-load_dotenv(override=True)
+def get_weather(city: str) -> str:
+    """Get weather for a given city."""
+    return f"It's always sunny in {city}!"
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash", 
+    google_api_key="AIzaSyBq9ILzSTELnw6SQRjxzS64ABp17lwyTUA"
+    
+)
 
+agent = create_agent(
+    model=llm,
+    tools=[get_weather],
+    system_prompt="You are a helpful assistant",
+)
 
-def rag_simple(query: str, top_k: int = 3) -> str:
-    """Retrieve context from the vector store and ask the LLM."""
-    results = rag_pipeline.query(query, top_k=top_k)
-    context = "\n\n".join([doc["content"] for doc in results]) if results else ""
+# Run the agent
+result=agent.invoke(
+    {"messages": [{"role": "user", "content": "what is the weather in sf"}]}
+)
 
-    if not context:
-        return "No relevant context found to answer the question"
-
-    prompt = f"""Use the following context to answer the question.
-
-    Context: 
-    {context}
-
-    Question:
-    {query}
-
-    Answer:
-
-    """
-
-    response = llm.invoke([prompt])
-    return response.content
-
-
-if __name__ == "__main__":
-    answer = rag_simple("What are the Limitations on Disclosure of Account Numbers?")
-    print(answer)
+print(result)
