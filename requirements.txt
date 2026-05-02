@@ -1,2 +1,17 @@
 sentence-transformers
 chromadb
+langchain
+langchain-community
+langchain-core
+langchain-openai
+langchain-chroma
+langchain-text-splitters
+langchain-huggingface
+langchain-community
+langchain-core
+langchain-openai
+langchain-chroma
+langchain-text-splitters
+langchain-huggingface
+langgraph
+langchain-google-genai

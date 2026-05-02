@@ -7,9 +7,10 @@ from pathlib import Path
 
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_core.documents import Document
-from langchain_core.vectorstores import InMemoryVectorStore  
+
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
 from .config import (
     EMBEDDING_MODEL,
     CHUNK_SIZE,
@@ -20,17 +21,19 @@ from .config import (
     DATA_DIR,
 )
 
-class RAG:
 
+class RAG:
     def __init__(self):
-        print(f"Loading embedding model: {EMBEDDING_MODEL}")
-        # self.embedding_model = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)  
         self.embedding_model = HuggingFaceEmbeddings(
             model_name=EMBEDDING_MODEL,
             model_kwargs={"device": "cpu"},
             encode_kwargs={"normalize_embeddings": True}
         )
-        self.vector_store = InMemoryVectorStore(embedding=self.embedding_model)         
+        self.vector_store = Chroma(
+            collection_name="banking_docs",
+            embedding_function=self.embedding_model,
+            persist_directory="./chroma_db"  # ✅ persists to disk
+        )      
 
 
 
@@ -78,17 +81,26 @@ class RAG:
 
 
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=CHUNK_SIZE,  # chunk size (characters)
-            chunk_overlap=CHUNK_OVERLAP,  # chunk overlap (characters)
-            add_start_index=True,  # track index in original document
+            chunk_size=CHUNK_SIZE,  
+            chunk_overlap=CHUNK_OVERLAP,  
+            add_start_index=True,  
         )
 
         all_splits = text_splitter.split_documents(all_docs)
         print(f"Split blog post into {len(all_splits)} sub-documents.")
+        print("Starting ingestion into ChromaDB...")
+        batch_size = 100
+        for i in range(0, len(all_splits), batch_size):
+            batch = all_splits[i : i + batch_size]
+            self.vector_store.add_documents(documents=batch)
+            print(f"Progress: {i + len(batch)} / {len(all_splits)} chunks ingested.")
+            print("Ingestion complete.")
+            return [f"Ingested {len(all_splits)} chunks"]
+
+
         
-        
-        document_ids = self.vector_store.add_documents(documents=all_splits)  
-        return document_ids
+        # document_ids = self.vector_store.add_documents(documents=all_splits)  
+        # return document_ids
 
 
 
