@@ -31,4 +31,6 @@ class VerificationResult(BaseModel):
 
 
     
-    
+class UserContext(BaseModel):
+    id_num: str = Field(description="Customer ID number")
+    full_name: str = Field(description="Customer Full Name")

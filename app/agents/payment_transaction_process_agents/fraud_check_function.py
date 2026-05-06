@@ -1,6 +1,6 @@
 from langchain_core.messages import HumanMessage, SystemMessage
 from app.schemas.payment_transaction_process_schema import TransferState
-from app.config.config import structured_evaluator_llm
+from app.config.payment_transaction_process.config import structured_evaluator_llm
 
 ## need to add hugging face model for fraud check when adding this code into separate file
 def fraud_check(state: TransferState):

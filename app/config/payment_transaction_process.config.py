@@ -8,7 +8,7 @@ load_dotenv()
 generator_llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     temperature=0.7,
-    google_api_key=os.getenv("GOOGLE_API_KEY"),
+    google_api_key=os.getenv("GOOGLE_API_KEY2"),
 )
 
 class FruadCheck(BaseModel):
