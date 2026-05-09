@@ -4,148 +4,14 @@ from langgraph.types import interrupt, Send, Command
 from langgraph.graph import StateGraph, START, END
 from app.schemas.loan_agent_schema import LoanState
 
+from app.agents.loan_agents.planner import planner
+from app.agents.loan_agents.credit_verification import credit_verification
+from app.agents.loan_agents.income_verification import income_verification
+from app.agents.loan_agents.underwriting_decision import underwriting_decision
+from app.agents.loan_agents.human_review import human_review
+from app.agents.loan_agents.notify_customer import notify_customer
+from app.conditions.loan_agent_condition.underwriting_condition import route_underwriting
 
-
-
-def planner(state: LoanState)-> dict:
-    loan_purpose = state['loan_purpose']
-    loan_amount = state['loan_amount']
-    
-    if loan_purpose == "personal":
-        tasks = ["credit_verification", "income_verification"]
-        return {"tasks": tasks}
-    elif loan_purpose == "business":
-        tasks = ["credit_verification", "income_verification", "collateral_evaluation"]
-        return {"tasks": tasks}
-    elif loan_purpose == "mortgage":
-        tasks = ["credit_verification", "income_verification", "collateral_evaluation"]
-        return {"tasks": tasks}
-    else:
-        return {"tasks": ["ineligible"]} 
-    
-
-
-
-def credit_verification(state: LoanState) -> dict:
-    monthly_income = state['monthly_income']
-    loan_amount = state['loan_amount']
-    if monthly_income > 50000:
-        score = 750
-    elif monthly_income >= 30000:
-        score = 650
-    else:
-        score = 550
-
-
-    flags = []
-    if monthly_income < 30000:
-        flags.append("low_income")
-    if loan_amount > (10 * monthly_income):
-        flags.append("high_debt_ratio")
-
-    return {
-        "credit_score": score,
-        "credit_flags": flags
-    }
-
-
-
-def income_verification(state: LoanState)->dict:
-    loan_amount = state['loan_amount']
-    monthly_income = state['monthly_income']
-    loan_term_months = state["loan_term_months"]
-
-    verified_income_ratio = (loan_amount / loan_term_months) / monthly_income
-
-    return {"verified_income_ratio": verified_income_ratio}
-
-def underwriting_decision(state: LoanState) -> dict:
-    credit_score = state["credit_score"]
-    verified_income_ratio = state["verified_income_ratio"]
-    credit_flags = state["credit_flags"]
-
-    if credit_score > 700 and verified_income_ratio < 0.3:
-        risk_tier = "low"
-    elif credit_score < 600 or verified_income_ratio > 0.5:
-        risk_tier = "high"
-    else:
-        risk_tier = "medium"
-
-    if risk_tier == "low" and not credit_flags:
-        decision = "auto_approve"
-    elif risk_tier == "high" or "high_debt_ratio" in credit_flags or "low_income" in credit_flags:
-        decision = "auto_decline"
-    else:
-        decision = "human_review" 
-
-    return {"underwriting_decision": decision}
-
-
-
-
-def human_review(state: LoanState) -> dict:
-    decision = interrupt({
-        "full_name": state["full_name"],
-        "id_card_num": state["id_card_num"],
-        "loan_amount": state["loan_amount"],
-        "loan_term_months": state["loan_term_months"],
-        "loan_purpose": state["loan_purpose"],
-        "loan_reason": state["loan_reason"],
-        "credit_score": state["credit_score"],
-        "credit_flags": state["credit_flags"],
-        "verified_income_ratio": state["verified_income_ratio"],
-        "underwriting_decision": state["underwriting_decision"]
-    })
-    return {"human_review_result": decision}
-
-
-def notify_customer(state: LoanState) -> dict:
-    # Use .get() so it doesn't crash if the key doesn't exist yet
-    decision = state.get("underwriting_decision") 
-    tasks = state.get("tasks", [])
-    full_name = state["full_name"]
-    
-    # Check for ineligibility FIRST
-    if "ineligible" in tasks:
-        status = "rejected"
-        message = f"Dear {full_name}, your application is ineligible for this loan type."
-        
-    elif decision == "auto_approve":
-        status = "approved"
-        message = f"Congratulations {full_name}, your loan has been automatically approved!"
-        
-    elif decision == "auto_decline":
-        status = "rejected"
-        message = f"Dear {full_name}, unfortunately your loan application has been declined based on our automated risk assessment."
-        
-    elif decision == "human_review":
-        human_result = state.get("human_review_result")
-        if human_result == "approved":
-            status = "approved"
-            message = f"Congratulations {full_name}, after manual review, your loan has been approved!"
-        else:
-            status = "rejected"
-            message = f"Dear {full_name}, after manual review, your loan application has been declined."
-            
-    else:
-        status = "error"
-        message = "There was an error processing your loan application."
-
-    return {
-        "loan_status": status,
-        "notification_message": message,
-        "workflow_status": "completed"
-    }  
-
-def route_underwriting(state: LoanState):
-    decision = state["underwriting_decision"]
-    if decision == "auto_approve" or decision == "auto_decline":
-        return "notify_customer"
-    elif decision == "human_review":
-        return "human_review"
-    elif decision == "ineligible":
-        return "notify_customer"
-    
 
 # The Dynamic Router
 def route_tasks(state: LoanState):
@@ -244,7 +110,7 @@ if __name__ == "__main__":
 
     def run_test_scenario(scenario_name: str, state_override: dict):
         print(f"\n{'='*60}")
-        print(f"🚀 RUNNING SCENARIO: {scenario_name}")
+        print(f"[START] RUNNING SCENARIO: {scenario_name}")
         print(f"{'='*60}")
         
         thread_id = str(uuid.uuid4())
@@ -271,22 +137,22 @@ if __name__ == "__main__":
         for event in loan_graph.stream(test_state, config, stream_mode="updates"):
             # Print only the node name to keep the terminal clean
             node_name = list(event.keys())[0]
-            print(f"✅ Executed Node: {node_name}")
+            print(f"[OK] Executed Node: {node_name}")
             
             # If we hit the notification node, print the final result
             if node_name == "notify_customer":
-                print(f"\n🎯 FINAL RESULT: {event['notify_customer']['loan_status'].upper()}")
-                print(f"📝 MESSAGE: {event['notify_customer']['notification_message']}")
+                print(f"\n[RESULT] FINAL RESULT: {event['notify_customer']['loan_status'].upper()}")
+                print(f"[INFO] MESSAGE: {event['notify_customer']['notification_message']}")
 
         # Check if the graph paused for Human Review
         current_state = loan_graph.get_state(config)
         if current_state.next and "human_review" in current_state.next:
-            print("\n⏸️ GRAPH PAUSED FOR HUMAN REVIEW")
-            print("▶️ Simulating Human Approval...")
+            print("\n[PAUSED] GRAPH PAUSED FOR HUMAN REVIEW")
+            print("[RESUME] Simulating Human Approval...")
             for event in loan_graph.stream(Command(resume="approved"), config, stream_mode="updates"):
                 if "notify_customer" in event:
-                    print(f"\n🎯 FINAL RESULT: {event['notify_customer']['loan_status'].upper()}")
-                    print(f"📝 MESSAGE: {event['notify_customer']['notification_message']}")
+                    print(f"\n[RESULT] FINAL RESULT: {event['notify_customer']['loan_status'].upper()}")
+                    print(f"[INFO] MESSAGE: {event['notify_customer']['notification_message']}")
 
     # --- THE TEST CASES ---
     
