@@ -1,18 +1,18 @@
 from pydantic import BaseModel, Field
-from typing import TypedDict, Literal, Annotated
+from typing import TypedDict, Literal, Annotated, Optional
 from langgraph.graph import add_messages
 
 class KYCState(TypedDict):
-    # customer inputs
-    id_card_num: str
-    phone_number: str
-    full_name: str
-    issue_date: str
-    expiry_date: str
-    nationality: str
-    date_of_birth: str
-    place_of_birth: str
-    gender: str
+    # customer inputs — Optional because they are populated by the extraction node
+    id_card_num: Optional[str]
+    phone_number: Optional[str]
+    full_name: Optional[str]
+    issue_date: Optional[str]
+    expiry_date: Optional[str]
+    nationality: Optional[str]
+    date_of_birth: Optional[str]
+    place_of_birth: Optional[str]
+    gender: Optional[str]
     
     # result fields
     kyc_score: float

@@ -12,6 +12,119 @@ from app.agents.loan_agents.human_review import human_review
 from app.agents.loan_agents.notify_customer import notify_customer
 from app.conditions.loan_agent_condition.underwriting_condition import route_underwriting
 
+import os
+from pydantic import BaseModel, Field
+from typing import Optional, Literal
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
+from dotenv import load_dotenv
+load_dotenv(override=True)
+
+
+# ── Extraction Schema ────────────────────────────────────────────────────────
+
+class LoanExtraction(BaseModel):
+    # Only the fields the user provides.
+    # All are Optional so the LLM doesn't hallucinate missing data.
+    full_name:        Optional[str]                                    = Field(None, description="The user's full legal name.")
+    id_card_num:      Optional[str]                                    = Field(None, description="The user's national ID card number.")
+    loan_amount:      Optional[float]                                  = Field(None, description="The total loan amount as a number.")
+    loan_term_months: Optional[int]                                    = Field(None, description="Repayment duration in months.")
+    monthly_income:   Optional[float]                                  = Field(None, description="The user's monthly income as a number.")
+    loan_purpose:     Optional[Literal['personal', 'business', 'mortgage']] = Field(None, description="Type of loan.")
+    loan_reason:      Optional[str]                                    = Field(None, description="Why the user wants the loan.")
+
+
+_extraction_llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    temperature=0,
+    google_api_key=os.getenv("GOOGLE_API_KEY2"),  # structured extraction — KEY2
+).with_structured_output(LoanExtraction)
+
+_conversation_llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    temperature=0.4,
+    google_api_key=os.getenv("GOOGLE_API_KEY1"),  # user-facing conversation — KEY1
+)
+
+_REQUIRED = ["full_name", "id_card_num", "loan_amount", "loan_term_months", "monthly_income", "loan_purpose"]
+
+
+# ── Extraction Node ──────────────────────────────────────────────────────────
+
+def extract_loan_details(state: LoanState) -> dict:
+    """
+    Reads the full chat history and extracts loan fields using a structured LLM.
+    If any required fields are still missing after extraction, generates a natural
+    conversational question and interrupts to wait for the user's reply.
+    """
+    # Build a readable conversation string for the extraction LLM
+    conversation = "\n".join(
+        f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content}"
+        for m in state.get("messages", [])
+        if hasattr(m, "content")
+    )
+
+    # Extract whatever is present in the conversation
+    extracted: LoanExtraction = _extraction_llm.invoke(
+        f"Read this conversation and extract loan application details. "
+        f"Return null for any field not mentioned.\n\n{conversation}"
+    )
+
+    # Merge into state — don't overwrite fields already collected
+    updates: dict = {}
+    for field, value in extracted.model_dump().items():
+        if value is not None and not state.get(field):
+            updates[field] = value
+
+    # Check what's still missing after this extraction pass
+    current = {**state, **updates}
+    missing = [f for f in _REQUIRED if not current.get(f)]
+
+    if missing:
+        # Ask the user naturally for the missing fields
+        collected_summary = ", ".join(
+            f"{f}={current[f]}" for f in _REQUIRED if current.get(f)
+        ) or "nothing yet"
+
+        question_msg = _conversation_llm.invoke([
+            SystemMessage(content=(
+                "You are a friendly bank loan officer collecting a loan application. "
+                "Ask the customer for the next missing piece of information naturally. "
+                "Ask for one or two fields at a time — never dump all questions at once. "
+                "Do not use field names; phrase the question conversationally."
+            )),
+            SystemMessage(content=f"Already collected: {collected_summary}. Still needed: {', '.join(missing)}."),
+        ] + state.get("messages", []))
+
+        question_text = question_msg.content
+
+        # Pause and wait for user reply
+        user_reply = interrupt(question_text)
+
+        # Extract fields from the user's new reply
+        reply_extracted: LoanExtraction = _extraction_llm.invoke(
+            f"The loan officer asked: \"{question_text}\"\n"
+            f"The user replied: \"{user_reply}\"\n"
+            f"Extract any loan fields from the reply. Return null for fields not mentioned."
+        )
+
+        for field, value in reply_extracted.model_dump().items():
+            if value is not None and not current.get(field):
+                updates[field] = value
+
+        updates["messages"] = [
+            AIMessage(content=question_text),
+            HumanMessage(content=user_reply),
+        ]
+
+    return updates
+
+
+def route_after_extraction(state: LoanState) -> str:
+    missing = [f for f in _REQUIRED if not state.get(f)]
+    return "planner" if not missing else "extract_loan_details"
+
 
 # The Dynamic Router
 def route_tasks(state: LoanState):
@@ -32,6 +145,7 @@ def route_tasks(state: LoanState):
 
 graph = StateGraph(LoanState)
 
+graph.add_node("extract_loan_details", extract_loan_details)
 graph.add_node("planner", planner)
 graph.add_node("credit_verification", credit_verification)
 graph.add_node("income_verification", income_verification)
@@ -39,7 +153,8 @@ graph.add_node("underwriting_decision", underwriting_decision)
 graph.add_node("human_review", human_review)
 graph.add_node("notify_customer", notify_customer)
 
-graph.add_edge(START, "planner")
+graph.add_edge(START, "extract_loan_details")
+graph.add_conditional_edges("extract_loan_details", route_after_extraction)
 graph.add_conditional_edges("planner", route_tasks)
 
 
