@@ -1,7 +1,20 @@
-from app.schemas.payment_transaction_process_schema import TransferState
+from schemas.payment_transaction_process_schema import TransferState
+
+from database.db_tool import transfer_funds
 
 def process_transfer(state: TransferState):
-    return {
-        'transaction_status': 'approved',
-        'notification_message': f"Dear {state['user']}, your transfer of {state['money']} has been approved to account number {state['to_transfer_acc_num']}."
-    }
+    # Pull requirements from the state
+    sender = state['sender_account_number']
+    receiver = state['receiver_account_number']
+    amount = state['money']
+
+    # Final execution in the database
+    result = transfer_funds(sender, receiver, amount)
+
+    if result["status"] == "success":
+        return {"transaction_status": "completed"}
+    else:
+        return {
+            "transaction_status": "failed",
+            "reason": result["reason"]
+        }

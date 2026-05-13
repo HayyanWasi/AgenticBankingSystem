@@ -1,14 +1,24 @@
-
-from app.schemas.payment_transaction_process_schema import TransferState
+from schemas.payment_transaction_process_schema import TransferState
 
 def notify_customer(state: TransferState):
     
-    if state['transaction_status'] == 'approved':
-        message = f"Dear {state['user']}, your transfer of {state['money']} has been approved to account number {state['to_transfer_acc_num']}."
-    elif state['transaction_status'] == 'failed':
-        message = f"Dear {state['user']}, your transfer of {state['money']} failed. Your current balance is {state['total_balance']}."
-    elif state['transaction_status'] == 'rejected':
-        message = f"Dear {state['user']}, your transfer of {state['money']} was rejected after manual review."
+    if state.get('notification_message'):
+        return {'notification_message': state['notification_message']}
+
+    status = state.get('transaction_status', 'unknown')
+    amount = state.get('money', '0.0')
+    receiver = state.get('receiver_account_number', 'an unknown account')
+    reason = state.get('reason', 'System error')
+
+    if status == 'completed':
+        message = f"Success! Your transfer of ${amount} to {receiver} has been completed."
+    
+    elif status == 'failed':
+        message = f"Transfer Failed. We could not process your transfer of ${amount}. Reason: {reason}."
+    
+    else:
+        message = f"Notice: Your transfer status is currently: {status}."
+
     return {
-        'notification_message': message,
+        'notification_message': message
     }

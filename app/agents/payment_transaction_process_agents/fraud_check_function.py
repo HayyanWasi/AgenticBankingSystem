@@ -1,52 +1,50 @@
-from langchain_core.messages import HumanMessage, SystemMessage
-from app.schemas.payment_transaction_process_schema import TransferState
-from app.config.payment_transaction_process_config import structured_evaluator_llm
+from datetime import datetime
+from schemas.payment_transaction_process_schema import TransferState
 
-## need to add hugging face model for fraud check when adding this code into separate file
 def fraud_check(state: TransferState):
+    # 1. Safely extract values to prevent KeyErrors and handle explicit None values
+    money = state.get('money') or 0.0
+    balance = state.get('total_balance') or 0.0
+    time_string = state.get('sent_time') or '12:00' # Default to safe hour if missing or None
 
-    messages=[
-        SystemMessage(
-            content=f"""
-            You are a **Fraud Detection agent**. Analyze the transaction below and return a fraud_score (0.0–1.0) and is_fraud (bool).
+    # 2. Prevent Division by Zero
+    if balance <= 0:
+        percent_used = 1.0 # Treat as 100% to trigger highest risk
+    else:
+        percent_used = money / balance
+        
+    # 3. Calculate Signal 1 (Amount vs Balance)
+    signal_1 = 0.0
+    if percent_used > 0.90:
+        signal_1 = 0.9
+    elif percent_used > 0.75:
+        signal_1 = 0.7
+    elif percent_used > 0.50:
+        signal_1 = 0.5
+    elif percent_used > 0.30:
+        signal_1 = 0.2
 
-            ## Scoring Rules — evaluate each signal independently, then compute a WEIGHTED average:
+    # 4. Calculate Signal 2 (Time of Day)
+    signal_2 = 0.0
+    try:
+        # Assuming time_string is formatted like "HH:MM"
+        hour = int(time_string.split(":")[0])
+        if 0 <= hour < 5:
+            signal_2 = 0.9
+        elif hour == 22 or hour == 23 or hour == 5:
+            signal_2 = 0.3
+    except (ValueError, AttributeError):
+        # If time parsing fails, assume moderate risk
+        signal_2 = 0.5 
 
-            **Signal 1 — Transfer amount vs balance (weight: 40%)**
-            - ≤ 30% of balance  → score 0.0  (normal)
-            - 31–50% of balance → score 0.2  (slightly elevated)
-            - 51–75% of balance → score 0.5  (moderate risk)
-            - 76–90% of balance → score 0.7  (high risk)
-            - > 90% of balance  → score 0.9  (very high risk)
-            Total balance: {state['total_balance']} | Transfer amount: {state['money']}
-            Percentage used: {round(state['money'] / state['total_balance'] * 100, 1)}%
-
-            **Signal 2 — Transaction hour (24h format) (weight: 40%)**
-            - 06:00–22:00 → score 0.0  (normal hours)
-            - 22:00–00:00 or 05:00–06:00 → score 0.3  (late/early)
-            - 00:00–05:00 → score 0.9  (highly suspicious hours)
-            Transaction time: {state['sent_time']}
-
-            **Signal 3 — Recipient account (weight: 20%)**
-            - Since you cannot verify accounts, treat all as unknown/external → always score 0.1
-            Recipient: {state['to_transfer_acc_num']}
-
-            ## Final Score Calculation
-            fraud_score = (Signal1 × 0.4) + (Signal2 × 0.4) + (Signal3 × 0.2)
-
-            ## Final Decision
-            - Set is_fraud = True ONLY if the computed fraud_score is ABOVE 0.7.
-            - Set is_fraud = False if fraud_score is 0.7 or below.
-
-            ## Calibration examples (follow these exactly):
-            - 1000/10000 (10%) at 2pm  → S1=0.0, S2=0.0, S3=0.1 → (0.0×0.4)+(0.0×0.4)+(0.1×0.2) = 0.02  → is_fraud=False
-            - 8000/10000 (80%) at 1am  → S1=0.7, S2=0.9, S3=0.1 → (0.7×0.4)+(0.9×0.4)+(0.1×0.2) = 0.66  → is_fraud=False
-            - 9500/10000 (95%) at 3am  → S1=0.9, S2=0.9, S3=0.1 → (0.9×0.4)+(0.9×0.4)+(0.1×0.2) = 0.74  → is_fraud=True
-
-            Balance Check Status: {state['balance_check_status']}
-            """,
-        ),
-        HumanMessage(content="Analyze this transaction and return your fraud assessment.")
-    ]
-    response = structured_evaluator_llm.invoke(messages)
-    return {'fraud_score': response.fraud_score, 'is_fraud': response.is_fraud}
+    # 5. Calculate Signal 3 (Recipient)
+    signal_3 = 0.1 # Hardcoded per your rules
+    
+    # 6. Final Calculation
+    fraud_score = (signal_1 * 0.4) + (signal_2 * 0.4) + (signal_3 * 0.2)
+    is_fraud = bool(fraud_score > 0.7)
+    
+    return {
+        'fraud_score': round(fraud_score, 2), 
+        'is_fraud': is_fraud
+    }

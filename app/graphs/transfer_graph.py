@@ -9,16 +9,16 @@ from typing import Optional
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from app.schemas.payment_transaction_process_schema import TransferState, FruadCheck
-from app.agents.payment_transaction_process_agents.balance_check_function import balance_check
-from app.agents.payment_transaction_process_agents.fraud_check_function import fraud_check
-from app.agents.payment_transaction_process_agents.notify_customer_functions import notify_customer
-from app.agents.payment_transaction_process_agents.human_review import human_review
-from app.agents.payment_transaction_process_agents.rejected_function import rejected
-from app.conditions.payment_transaction_process_condition.process_transfer import process_transfer
-from app.conditions.payment_transaction_process_condition.balance_check_condition import balance_check_condition
-from app.conditions.payment_transaction_process_condition.fraud_check_condition import fraud_check_condition
-from app.conditions.payment_transaction_process_condition.human_review_condition import human_review_condition
+from schemas.payment_transaction_process_schema import TransferState, FraudCheck
+from agents.payment_transaction_process_agents.balance_check_function import balance_check
+from agents.payment_transaction_process_agents.fraud_check_function import fraud_check
+from agents.payment_transaction_process_agents.notify_customer_functions import notify_customer
+from agents.payment_transaction_process_agents.human_review import human_review
+from agents.payment_transaction_process_agents.rejected_function import rejected
+from conditions.payment_transaction_process_condition.process_transfer import process_transfer
+from conditions.payment_transaction_process_condition.balance_check_condition import balance_check_condition
+from conditions.payment_transaction_process_condition.fraud_check_condition import fraud_check_condition
+from conditions.payment_transaction_process_condition.human_review_condition import human_review_condition
 
 load_dotenv()
 
@@ -26,12 +26,9 @@ load_dotenv()
 # ── Extraction Schema ────────────────────────────────────────────────────────
 
 class TransferExtraction(BaseModel):
-    user:                Optional[str] = Field(None, description="The sender's full name.")
-    account_num:         Optional[int] = Field(None, description="The sender's account number.")
-    to_transfer_acc_num: Optional[int] = Field(None, description="The recipient's account number.")
-    money:               Optional[int] = Field(None, description="The amount of money to transfer as a whole number.")
-    total_balance:       Optional[int] = Field(None, description="The sender's current account balance.")
-
+    sender_account_number: str | None = Field(default=None, description="The account sending money. Accept ANY string of characters or numbers.")
+    receiver_account_number: str | None = Field(default=None, description="The account receiving money. Accept ANY string of characters or numbers.")
+    money: float | None = Field(default=None, description="The numerical amount to transfer")
 
 _extraction_llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
@@ -45,26 +42,25 @@ _conversation_llm = ChatGoogleGenerativeAI(
     google_api_key=os.getenv("GOOGLE_API_KEY1"),  # user-facing conversation — KEY1
 )
 
-_REQUIRED = ["user", "account_num", "to_transfer_acc_num", "money", "total_balance"]
+from datetime import datetime
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langgraph.types import interrupt
 
+# ONLY require the fields the user must provide in the chat
+_REQUIRED = ["sender_account_number", "receiver_account_number", "money"]
 
 # ── Extraction Node ──────────────────────────────────────────────────────────
 
 def extract_transfer_details(state: TransferState) -> dict:
-    """
-    Reads the chat history, extracts transfer fields via structured LLM output.
-    Interrupts with a natural question if any required field is still missing.
-    """
-    conversation = "\n".join(
-        f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content}"
-        for m in state.get("messages", [])
-        if hasattr(m, "content")
-    )
-
-    extracted: TransferExtraction = _extraction_llm.invoke(
-        f"Read this conversation and extract bank transfer details. "
-        f"Return null for any field not mentioned.\n\n{conversation}"
-    )
+    
+    current_data = {f: state.get(f) for f in _REQUIRED if state.get(f)}
+    
+    # 2. Feed the ENTIRE message history to the extractor to maintain context
+    extraction_messages = [
+        SystemMessage(content=f"Extract transfer details from this conversation. Current verified data: {current_data}. Return null for missing fields.")
+    ] + state.get("messages", [])
+    
+    extracted: TransferExtraction = _extraction_llm.invoke(extraction_messages)
 
     updates: dict = {}
     for field, value in extracted.model_dump().items():
@@ -74,6 +70,12 @@ def extract_transfer_details(state: TransferState) -> dict:
     current = {**state, **updates}
     missing = [f for f in _REQUIRED if current.get(f) is None]
 
+    # 3. Objective reality check in the terminal
+    print(f"\n--- [DEBUG] EXTRACTION LOGIC ---")
+    print(f"Extracted Data: {current}")
+    print(f"Still Missing: {missing}")
+    print(f"--------------------------------\n")
+
     if missing:
         collected_summary = ", ".join(
             f"{f}={current[f]}" for f in _REQUIRED if current.get(f) is not None
@@ -81,42 +83,30 @@ def extract_transfer_details(state: TransferState) -> dict:
 
         question_msg = _conversation_llm.invoke([
             SystemMessage(content=(
-                "You are a helpful bank teller processing a money transfer. "
-                "Ask the customer for the next missing piece of information naturally. "
-                "Ask for one or two things at a time. Be friendly and concise."
+                "You are a helpful bank teller. "
+                "Ask the customer for the missing information naturally. Ask for ONE thing at a time. "
+                "CRITICAL: Do NOT say you have all the details. You are explicitly missing data."
             )),
-            SystemMessage(content=f"Already collected: {collected_summary}. Still needed: {', '.join(missing)}."),
+            SystemMessage(content=f"Already collected: {collected_summary}. STRICTLY STILL NEEDED: {', '.join(missing)}."),
         ] + state.get("messages", []))
 
         question_text = question_msg.content
         user_reply = interrupt(question_text)
 
-        reply_extracted: TransferExtraction = _extraction_llm.invoke(
-            f"The teller asked: \"{question_text}\"\n"
-            f"The user replied: \"{user_reply}\"\n"
-            f"Extract any transfer fields from the reply. Return null for fields not mentioned."
-        )
-
-        for field, value in reply_extracted.model_dump().items():
-            if value is not None and current.get(field) is None:
-                updates[field] = value
-
+        # Save the interaction so the next loop has the full context
         updates["messages"] = [
             AIMessage(content=question_text),
             HumanMessage(content=user_reply),
         ]
 
-    # Set sent_time if not already present
-    if not updates.get("sent_time") and not state.get("sent_time"):
-        updates["sent_time"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if not missing and not updates.get("sent_time") and not state.get("sent_time"):
+        updates["sent_time"] = datetime.now().strftime("%H:%M") 
 
     return updates
-
 
 def route_after_extraction(state: TransferState) -> str:
     missing = [f for f in _REQUIRED if state.get(f) is None]
     return "balance_check" if not missing else "extract_transfer_details"
-
 
 transfer_workflow = StateGraph(TransferState)
 

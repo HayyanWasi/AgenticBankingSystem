@@ -64,9 +64,16 @@ def extract_kyc_details(state: KYCState) -> dict:
         if hasattr(m, "content")
     )
 
+    latest_message = state.get("messages", [])[-1].content 
+
+    # Current known data
+    current_data = {f: state.get(f) for f in _REQUIRED if state.get(f)}
+    # Extract whatever is present in the conversation
     extracted: KYCExtraction = _extraction_llm.invoke(
-        f"Read this conversation and extract KYC identity verification details. "
-        f"Return null for any field not mentioned.\n\n{conversation}"
+    f"Current Application State: {current_data}\n"
+    f"New User Input: {latest_message}\n"
+    f"Update the application state based on the new input. "
+    f"If the user corrects an existing field, provide the new value."
     )
 
     updates: dict = {}
@@ -85,8 +92,8 @@ def extract_kyc_details(state: KYCState) -> dict:
         question_msg = _conversation_llm.invoke([
             SystemMessage(content=(
                 "You are a bank compliance officer conducting a KYC (Know Your Customer) verification. "
-                "Ask the customer for the next missing identity detail naturally and politely. "
-                "Ask for one or two things at a time. Do not use technical field names."
+                "Ask the customer for the missing identity details naturally and politely. "
+                "Ask for atleast two or three things at a time. Do not use technical field names."
             )),
             SystemMessage(content=f"Already collected: {collected_summary}. Still needed: {', '.join(missing)}."),
         ] + state.get("messages", []))
@@ -239,4 +246,4 @@ if __name__ == "__main__":
     result = workflow.invoke(initial_state, config=config3)
     print("Score:", result['kyc_score'])
     print("Status:", result['verification_status'])
-    print("Notification:", result['notification_message'])
+    print("Notification:", result['notification_message'])

@@ -65,10 +65,17 @@ def extract_loan_details(state: LoanState) -> dict:
         if hasattr(m, "content")
     )
 
+
+    latest_message = state.get("messages", [])[-1].content 
+
+    # Current known data
+    current_data = {f: state.get(f) for f in _REQUIRED if state.get(f)}
     # Extract whatever is present in the conversation
     extracted: LoanExtraction = _extraction_llm.invoke(
-        f"Read this conversation and extract loan application details. "
-        f"Return null for any field not mentioned.\n\n{conversation}"
+    f"Current Application State: {current_data}\n"
+    f"New User Input: {latest_message}\n"
+    f"Update the application state based on the new input. "
+    f"If the user corrects an existing field, provide the new value."
     )
 
     # Merge into state — don't overwrite fields already collected
