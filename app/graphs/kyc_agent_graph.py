@@ -6,6 +6,7 @@ from app.agents.kyc_agents.kyc_agent_results import kyc_agent_results
 from app.schemas.kyc_agent_schema import KYCState
 from app.conditions.kyc_process_conditions.kyc_tool_conditions import tools_condition
 from app.conditions.kyc_process_conditions.score_conditions import score_condition
+from app.agents.kyc_agents.upsert_kycrecord import upsert_kyc_record, route_after_upsert
 from app.config.kyc_config import tool_node
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -21,95 +22,65 @@ from langgraph.types import Command, interrupt
 load_dotenv(override=True)
 
 
-# ── Extraction Schema ────────────────────────────────────────────────────────
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from pydantic import BaseModel, Field
+from langgraph.types import interrupt
 
+
+from app.config.payment_transaction_process_config import structured_evaluator_llm, _conversation_llm # Use your actual LLM config imports
+
+_REQUIRED_KYC = ["full_name", "id_card_num", "phone_number", "nationality"]
+
+# 1. Relaxed schema for robust extraction
 class KYCExtraction(BaseModel):
-    id_card_num:    Optional[str] = Field(None, description="National ID card number.")
-    full_name:      Optional[str] = Field(None, description="Customer's full legal name exactly as on ID.")
-    phone_number:   Optional[str] = Field(None, description="Phone number.")
-    issue_date:     Optional[str] = Field(None, description="ID card issue date in YYYY-MM-DD format.")
-    expiry_date:    Optional[str] = Field(None, description="ID card expiry date in YYYY-MM-DD format.")
-    nationality:    Optional[str] = Field(None, description="Nationality.")
-    date_of_birth:  Optional[str] = Field(None, description="Date of birth in YYYY-MM-DD format.")
-    place_of_birth: Optional[str] = Field(None, description="City or place of birth.")
-    gender:         Optional[str] = Field(None, description="Gender: Male or Female.")
+    full_name: str | None = Field(default=None, description="The user's full name.")
+    id_card_num: str | None = Field(default=None, description="The user's ID card number or passport number. Accept any string of letters/numbers.")
+    phone_number: str | None = Field(default=None, description="The user's phone number.")
+    nationality: str | None = Field(default=None, description="The user's nationality or country of origin.")
 
-
-_extraction_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0,
-    google_api_key=os.getenv("GOOGLE_API_KEY2"),  # structured extraction — KEY2
-).with_structured_output(KYCExtraction)
-
-_conversation_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0.4,
-    google_api_key=os.getenv("GOOGLE_API_KEY1"),  # user-facing conversation — KEY1
-)
-
-_REQUIRED = ["id_card_num", "full_name", "phone_number", "issue_date",
-             "expiry_date", "nationality", "date_of_birth", "place_of_birth", "gender"]
-
-
-# ── Extraction Node ──────────────────────────────────────────────────────────
+_extraction_llm = structured_evaluator_llm.with_structured_output(KYCExtraction)
 
 def extract_kyc_details(state: KYCState) -> dict:
-    """
-    Reads the chat history, extracts KYC fields via structured LLM output.
-    Interrupts with a natural question if any required field is still missing.
-    """
-    conversation = "\n".join(
-        f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content}"
-        for m in state.get("messages", [])
-        if hasattr(m, "content")
-    )
-
-    latest_message = state.get("messages", [])[-1].content 
-
-    # Current known data
-    current_data = {f: state.get(f) for f in _REQUIRED if state.get(f)}
-    # Extract whatever is present in the conversation
-    extracted: KYCExtraction = _extraction_llm.invoke(
-    f"Current Application State: {current_data}\n"
-    f"New User Input: {latest_message}\n"
-    f"Update the application state based on the new input. "
-    f"If the user corrects an existing field, provide the new value."
-    )
+    
+    current_data = {f: state.get(f) for f in _REQUIRED_KYC if state.get(f)}
+    
+    # 2. Feed the ENTIRE message history to maintain context
+    extraction_messages = [
+        SystemMessage(content=f"Extract KYC details from this conversation. Current verified data: {current_data}. Return null for missing fields.")
+    ] + state.get("messages", [])
+    
+    extracted: KYCExtraction = _extraction_llm.invoke(extraction_messages)
 
     updates: dict = {}
     for field, value in extracted.model_dump().items():
-        if value is not None and not state.get(field):
+        if value is not None and state.get(field) is None:
             updates[field] = value
 
     current = {**state, **updates}
-    missing = [f for f in _REQUIRED if not current.get(f)]
+    missing = [f for f in _REQUIRED_KYC if current.get(f) is None]
+
+    # 3. Objective reality check in the terminal
+    print(f"\n--- [DEBUG] KYC EXTRACTION ---")
+    print(f"Extracted Data: {current}")
+    print(f"Still Missing: {missing}")
+    print(f"------------------------------\n")
 
     if missing:
         collected_summary = ", ".join(
-            f"{f}={current[f]}" for f in _REQUIRED if current.get(f)
+            f"{f}={current[f]}" for f in _REQUIRED_KYC if current.get(f) is not None
         ) or "nothing yet"
 
         question_msg = _conversation_llm.invoke([
             SystemMessage(content=(
-                "You are a bank compliance officer conducting a KYC (Know Your Customer) verification. "
-                "Ask the customer for the missing identity details naturally and politely. "
-                "Ask for atleast two or three things at a time. Do not use technical field names."
+                "You are a strict but polite bank compliance officer collecting KYC (Know Your Customer) information. "
+                "Ask the customer for the missing information naturally. Ask for ONE or TWO things at a time. "
+                "Do NOT use technical field names. Do NOT say you have all the details."
             )),
-            SystemMessage(content=f"Already collected: {collected_summary}. Still needed: {', '.join(missing)}."),
+            SystemMessage(content=f"Already collected: {collected_summary}. STRICTLY STILL NEEDED: {', '.join(missing)}."),
         ] + state.get("messages", []))
 
         question_text = question_msg.content
         user_reply = interrupt(question_text)
-
-        reply_extracted: KYCExtraction = _extraction_llm.invoke(
-            f"The officer asked: \"{question_text}\"\n"
-            f"The user replied: \"{user_reply}\"\n"
-            f"Extract any KYC identity fields from the reply. Return null for fields not mentioned."
-        )
-
-        for field, value in reply_extracted.model_dump().items():
-            if value is not None and not current.get(field):
-                updates[field] = value
 
         updates["messages"] = [
             AIMessage(content=question_text),
@@ -118,15 +89,20 @@ def extract_kyc_details(state: KYCState) -> dict:
 
     return updates
 
-
+# 4. Routing logic mapped to our next database node
 def route_after_extraction(state: KYCState) -> str:
-    missing = [f for f in _REQUIRED if not state.get(f)]
-    return "kyc_agent" if not missing else "extract_kyc_details"
-
+    missing = [f for f in _REQUIRED_KYC if state.get(f) is None]
+    
+    if missing:
+        return "extract_kyc_details"
+        
+    # Once we have all 4 fields, we hit the database
+    return "upsert_kyc_record"
 
 graph = StateGraph(KYCState)
 
 graph.add_node("extract_kyc_details", extract_kyc_details)
+graph.add_node("upsert_kyc_record", upsert_kyc_record) # <--- ADDED
 graph.add_node("kyc_agent", kyc_agent)
 graph.add_node("action", tool_node)
 graph.add_node("kyc_agent_results", kyc_agent_results)
@@ -135,7 +111,10 @@ graph.add_node('notify_customer', notify_customer)
 
 
 graph.add_edge(START, "extract_kyc_details")
+
 graph.add_conditional_edges("extract_kyc_details", route_after_extraction)
+
+graph.add_conditional_edges("upsert_kyc_record", route_after_upsert) # <--- ADDED
 graph.add_conditional_edges(
     "kyc_agent",
     tools_condition,

@@ -1,7 +1,8 @@
+from datetime import datetime
 from sqlalchemy.orm import Session
 from database.engine import engine
-from models import Account
-from models import Transaction
+from models import Account, Transaction, User, KYC
+
 def get_account_balance(account_number: str) -> dict:
     """A strictly controlled tool for agents to check an account balance."""
     with Session(engine) as session:
@@ -79,4 +80,87 @@ if __name__ == "__main__":
     print(result2)
 
     print("\nTest 3: Successful transfer")
-    print(transfer_funds("ACCT-5555", "ACCT-6666", 150.0))
+    print(transfer_funds("ACCT-5555", "ACCT-6666", 150.0))
+
+
+
+def get_kyc_status(full_name: str) -> dict:
+    """Fetches the current KYC status for a user."""
+    with Session(engine) as db:
+        user = db.query(User).filter(User.full_name.ilike(full_name)).first()
+        
+        if not user:
+            return {"status": "failed", "reason": "User not found in the system."}
+            
+        if not user.kyc_record:
+            return {
+                "status": "success", 
+                "verification_status": "unverified",
+                "kyc_score": 0.0,
+                "message": "User exists but has no KYC record."
+            }
+            
+        return {
+            "status": "success",
+            "verification_status": user.kyc_record.verification_status,
+            "kyc_score": user.kyc_record.kyc_score,
+            "reject_reason": user.kyc_record.reject_reason
+        }
+
+def upsert_user_kyc_details(full_name: str, id_card_num: str, phone_number: str, nationality: str) -> dict:
+    """Updates user details and creates a pending KYC record if one doesn't exist."""
+    with Session(engine) as db:
+        # 1. Find or create the user
+        user = db.query(User).filter(User.full_name.ilike(full_name)).first()
+        
+        if not user:
+            # Check for duplicate ID cards to prevent SQLite Integrity Errors
+            existing_id = db.query(User).filter(User.id_card_num == id_card_num).first()
+            if existing_id:
+                return {"status": "failed", "reason": "ID Card Number is already registered to another user."}
+                
+            user = User(
+                full_name=full_name, 
+                id_card_num=id_card_num, 
+                phone_number=phone_number, 
+                nationality=nationality
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        else:
+            # Update existing user data
+            user.id_card_num = id_card_num
+            user.phone_number = phone_number
+            user.nationality = nationality
+            db.commit()
+
+        # 2. Ensure a KYC record exists
+        if not user.kyc_record:
+            new_kyc = KYC(
+                user_id=user.user_id, 
+                kyc_score=0.0, 
+                verification_status="pending"
+            )
+            db.add(new_kyc)
+            db.commit()
+
+        return {"status": "success", "message": "Identity details saved and KYC status set to pending."}
+
+def update_kyc_decision(full_name: str, status: str, score: float, reject_reason: str = None) -> dict:
+    """Saves the final compliance decision to the database."""
+    with Session(engine) as db:
+        user = db.query(User).filter(User.full_name.ilike(full_name)).first()
+        
+        if not user or not user.kyc_record:
+            return {"status": "failed", "reason": "Cannot update decision. KYC record not found."}
+
+        # Update the record
+        user.kyc_record.verification_status = status
+        user.kyc_record.kyc_score = score
+        user.kyc_record.reject_reason = reject_reason
+        user.kyc_record.last_updated = datetime.utcnow()
+
+        db.commit()
+        return {"status": "success", "message": f"KYC updated to '{status}'."}
+        
