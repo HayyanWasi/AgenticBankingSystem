@@ -1,4 +1,4 @@
-from app.schemas.kyc_agent_schema import KYCState
+from schemas.kyc_agent_schema import KYCState
 
 
 
@@ -29,32 +29,27 @@ from app.schemas.kyc_agent_schema import KYCState
 
 
 #To reduce LLM calls costs
-def kyc_agent_results(state: KYCState):
+def kyc_agent_results(state: KYCState) -> dict:
     import json
     
-    # find tool message in state
-    for message in reversed(state['messages']):
-        if hasattr(message, 'name') and message.name == 'verify_customer_id':
-            tool_result = json.loads(message.content)
-            score = tool_result['score']
-            
-            if score >= 0.8:
-                status = 'approved'
-            elif score >= 0.4:
-                status = 'human_review'
-            else:
-                status = 'rejected'
-            
-            rejection_reason = ""
-            if 'reason' in tool_result:
-                rejection_reason = tool_result['reason']
-            elif not tool_result.get('name_match'):
-                rejection_reason = "Name does not match ID records."
-            elif not tool_result.get('not_expired'):
-                rejection_reason = "ID card is expired."
-                
-            return {
-                "kyc_score": score,
-                "verification_status": status,
-                "rejection_reason": rejection_reason
-            }
+    for message in reversed(state.get('messages', [])):
+        if hasattr(message, 'tool_call_id'):
+            try:
+                data = json.loads(message.content)
+                if 'score' in data:
+                    score = data['score']
+                    # Use status from tool if present, otherwise derive from score
+                    status = data.get('status') or (
+                        'approved' if score >= 0.8 else
+                        'human_review' if score >= 0.4 else
+                        'rejected'
+                    )
+                    return {
+                        "kyc_score": score,
+                        "verification_status": status,
+                        "reject_reason": data.get('reason') or data.get('rejection_reason')
+                    }
+            except Exception:
+                continue
+
+    return {"verification_status": "failed", "reject_reason": "No evaluation found."}

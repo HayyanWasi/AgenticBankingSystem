@@ -31,13 +31,13 @@ class TransferExtraction(BaseModel):
     money: float | None = Field(default=None, description="The numerical amount to transfer")
 
 _extraction_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+    model="gemini-2.0-flash",
     temperature=0,
     google_api_key=os.getenv("GOOGLE_API_KEY2"),  # structured extraction — KEY2
 ).with_structured_output(TransferExtraction)
 
 _conversation_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+    model="gemini-2.0-flash",
     temperature=0.4,
     google_api_key=os.getenv("GOOGLE_API_KEY1"),  # user-facing conversation — KEY1
 )

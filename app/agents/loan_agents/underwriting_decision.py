@@ -1,4 +1,4 @@
-from app.schemas.loan_agent_schema import LoanState
+from schemas.loan_agent_schema import LoanState
 
 def underwriting_decision(state: LoanState) -> dict:
     credit_score = state["credit_score"]

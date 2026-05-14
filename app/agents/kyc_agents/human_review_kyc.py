@@ -5,36 +5,32 @@ from database.db_tool import update_kyc_decision
 
 
 def human_review(state: KYCState) -> dict:
-    # 1. The Breakpoint
+    # The pause
     decision_payload = interrupt({
-        'full_name': state.get('full_name'),
-        'id_card_num': state.get('id_card_num'),
-        'kyc_score': state.get('kyc_score'),
-        'verification_status': state.get('verification_status'),    
-        'question': 'Approve or reject this KYC?'
+        "question": f"Review required for {state.get('full_name')}",
+        "current_score": state.get("kyc_score")
     })
 
-    # Extract decision from the admin input
-    action = decision_payload.get('action')
-    reason = decision_payload.get('reason')
+    # The resume logic
+    action = decision_payload.get("action")
+    reason = decision_payload.get("reason", "Manual review completed")
 
-    if action == "approve":
-        final_status = "approved"
-        kyc_signal = "success"
-    else:
-        final_status = "rejected"
-        kyc_signal = "failed"
+    final_status = "approved" if action == "approve" else "rejected"
 
-    # 3. Database Update
+    id_card = state.get("id_card_num")
+    history = state.get("messages", [])
+
+    # Persist the decision to the database
     update_kyc_decision(
-        id_card_num=state.get('id_card_num'), 
-        status=final_status,
-        score=state.get('kyc_score', 0.0),
+        id_card_num=id_card,
+        status="approved" if action == "approve" else "rejected",
+        score=state.get("kyc_score", 0.0),
+        messages=history, # This is what populates the audit_trail
         reject_reason=reason
     )
 
     return {
         "verification_status": final_status,
-        "kyc_status": kyc_signal,
+        "human_decision": action,
         "reject_reason": reason
     }

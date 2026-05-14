@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from sqlalchemy.orm import Session
 from database.engine import engine
@@ -64,23 +65,23 @@ def transfer_funds(from_account_number, to_account_number, amount)-> dict:
 #     print(result)
 
 
-if __name__ == "__main__":
-    print("--- Testing Database Tools ---")
+# if __name__ == "__main__":
+#     print("--- Testing Database Tools ---")
 
-    sender = "ACCT-5555"
+#     sender = "ACCT-5555"
 
-    print(f"Initial balance for {sender}:", get_account_balance(sender))
+#     print(f"Initial balance for {sender}:", get_account_balance(sender))
 
-    print("\nTest 1: Transfer to fake account")
-    result1 = transfer_funds(sender, "FAKE-999", 50.0)
-    print(result1)
+#     print("\nTest 1: Transfer to fake account")
+#     result1 = transfer_funds(sender, "FAKE-999", 50.0)
+#     print(result1)
 
-    print("\nTest 2: Negative amount")
-    result2 = transfer_funds(sender, "ACCT-5555", -10.0)
-    print(result2)
+#     print("\nTest 2: Negative amount")
+#     result2 = transfer_funds(sender, "ACCT-5555", -10.0)
+#     print(result2)
 
-    print("\nTest 3: Successful transfer")
-    print(transfer_funds("ACCT-5555", "ACCT-6666", 150.0))
+#     print("\nTest 3: Successful transfer")
+#     print(transfer_funds("ACCT-5555", "ACCT-6666", 150.0))
 
 
 
@@ -147,20 +148,51 @@ def upsert_user_kyc_details(full_name: str, id_card_num: str, phone_number: str,
 
         return {"status": "success", "message": "Identity details saved and KYC status set to pending."}
 
-def update_kyc_decision(full_name: str, status: str, score: float, reject_reason: str = None) -> dict:
-    """Saves the final compliance decision to the database."""
+
+
+def serialize_messages(messages: list) -> str:
+    """Helper to convert LangChain objects to a JSON string."""
+    if not messages:
+        return "[]"
+    # Extracts only role and text for readability
+    return json.dumps([
+        {"role": m.type, "content": m.content} 
+        for m in messages if hasattr(m, 'content')
+    ])
+
+def update_kyc_decision(id_card_num: str, status: str, score: float, messages: list, reject_reason: str = None):
     with Session(engine) as db:
-        user = db.query(User).filter(User.full_name.ilike(full_name)).first()
+        user = db.query(User).filter(User.id_card_num == id_card_num).first()
         
-        if not user or not user.kyc_record:
-            return {"status": "failed", "reason": "Cannot update decision. KYC record not found."}
+        if user and user.kyc_record:
+            user.kyc_record.verification_status = status
+            user.kyc_record.kyc_score = score
+            user.kyc_record.reject_reason = reject_reason
+            user.kyc_record.last_updated = datetime.utcnow()
+            
+            # This saves the entire conversation history into the audit_trail column
+            user.kyc_record.audit_trail = serialize_messages(messages)
+            
+            db.commit()
+            print(f"--- [DB DEBUG] Successfully updated {id_card_num} to {status} ---")
+def get_user_kyc_status(id_card_num: str) -> dict:
+    with Session(engine) as db:
+        user = db.query(User).filter(User.id_card_num == id_card_num).first()
 
-        # Update the record
-        user.kyc_record.verification_status = status
-        user.kyc_record.kyc_score = score
-        user.kyc_record.reject_reason = reject_reason
-        user.kyc_record.last_updated = datetime.utcnow()
+        if not user:
+            return {"status": "not_found", "message": "No user found with this ID."}
 
-        db.commit()
-        return {"status": "success", "message": f"KYC updated to '{status}'."}
-        
+        kyc = user.kyc_record
+        HIGH_RISK_COUNTRIES = ["North Korea", "Ukraine", "Afghanistan"]
+        is_risk = user.nationality in HIGH_RISK_COUNTRIES
+
+        return {
+            "status": "success",
+            "full_name": user.full_name,
+            "nationality": user.nationality,
+            "phone_number": user.phone_number,
+            "is_high_risk": is_risk,
+            "verification_status": kyc.verification_status if kyc else "no_record",
+            "kyc_score": kyc.kyc_score if kyc else 0.0,
+            "reject_reason": kyc.reject_reason if kyc else None
+        }

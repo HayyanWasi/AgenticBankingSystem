@@ -2,15 +2,15 @@
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import interrupt, Send, Command
 from langgraph.graph import StateGraph, START, END
-from app.schemas.loan_agent_schema import LoanState
+from schemas.loan_agent_schema import LoanState
 
-from app.agents.loan_agents.planner import planner
-from app.agents.loan_agents.credit_verification import credit_verification
-from app.agents.loan_agents.income_verification import income_verification
-from app.agents.loan_agents.underwriting_decision import underwriting_decision
-from app.agents.loan_agents.human_review import human_review
-from app.agents.loan_agents.notify_customer import notify_customer
-from app.conditions.loan_agent_condition.underwriting_condition import route_underwriting
+from agents.loan_agents.planner import planner
+from agents.loan_agents.credit_verification import credit_verification
+from agents.loan_agents.income_verification import income_verification
+from agents.loan_agents.underwriting_decision import underwriting_decision
+from agents.loan_agents.human_review import human_review
+from agents.loan_agents.notify_customer import notify_customer
+from conditions.loan_agent_condition.underwriting_condition import route_underwriting
 
 import os
 from pydantic import BaseModel, Field

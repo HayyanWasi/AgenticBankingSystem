@@ -1,15 +1,15 @@
 from langchain_core.messages import HumanMessage
-from app.schemas.bank_manager import SupervisorState
+from schemas.bank_manager import SupervisorState
 
 from langgraph.graph.state import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 
-from app.graphs.kyc_agent_graph import workflow as kyc_graph
-from app.graphs.loan_agent_graph import loan_graph as loan_agent_graph
-from app.graphs.transfer_graph import transfer_workflow as transfer_agent_graph
+from graphs.kyc_agent_graph import workflow as kyc_graph
+from graphs.loan_agent_graph import loan_graph as loan_agent_graph
+from graphs.transfer_graph import transfer_workflow as transfer_agent_graph
 
-from app.config.supervisor_config import route_decision_llm
+from config.supervisor_config import route_decision_llm
 
 
 def supervisor_route(state: SupervisorState) -> dict:

@@ -1,13 +1,13 @@
 import os
-from app.agents.kyc_agents.notify_customer import notify_customer
-from app.agents.kyc_agents.human_review_kyc import human_review
-from app.agents.kyc_agents.kyc_agent import kyc_agent
-from app.agents.kyc_agents.kyc_agent_results import kyc_agent_results
-from app.schemas.kyc_agent_schema import KYCState
-from app.conditions.kyc_process_conditions.kyc_tool_conditions import tools_condition
-from app.conditions.kyc_process_conditions.score_conditions import score_condition
-from app.agents.kyc_agents.upsert_kycrecord import upsert_kyc_record, route_after_upsert
-from app.config.kyc_config import tool_node
+from agents.kyc_agents.notify_customer import notify_customer
+from agents.kyc_agents.human_review_kyc import human_review
+from agents.kyc_agents.kyc_agent import kyc_agent
+from agents.kyc_agents.kyc_agent_results import kyc_agent_results
+from schemas.kyc_agent_schema import KYCState
+from conditions.kyc_process_conditions.kyc_tool_conditions import tools_condition
+from conditions.kyc_process_conditions.score_conditions import score_condition
+from agents.kyc_agents.upsert_kycrecord import upsert_kyc_record, route_after_upsert
+from config.kyc_config import tool_node
 from pydantic import BaseModel, Field
 from typing import Optional
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field
 from langgraph.types import interrupt
 
 
-from app.config.payment_transaction_process_config import structured_evaluator_llm, _conversation_llm # Use your actual LLM config imports
+from config.kyc_config import kyc_conversation_llm as _conversation_llm, kyc_extraction_llm_base
 
 _REQUIRED_KYC = ["full_name", "id_card_num", "phone_number", "nationality"]
 
@@ -38,7 +38,7 @@ class KYCExtraction(BaseModel):
     phone_number: str | None = Field(default=None, description="The user's phone number.")
     nationality: str | None = Field(default=None, description="The user's nationality or country of origin.")
 
-_extraction_llm = structured_evaluator_llm.with_structured_output(KYCExtraction)
+_extraction_llm = kyc_extraction_llm_base.with_structured_output(KYCExtraction)
 
 def extract_kyc_details(state: KYCState) -> dict:
     
@@ -46,7 +46,7 @@ def extract_kyc_details(state: KYCState) -> dict:
     
     # 2. Feed the ENTIRE message history to maintain context
     extraction_messages = [
-        SystemMessage(content=f"Extract KYC details from this conversation. Current verified data: {current_data}. Return null for missing fields.")
+        HumanMessage(content=f"Extract KYC details from this conversation. Current verified data: {current_data}. Return null for missing fields.")
     ] + state.get("messages", [])
     
     extracted: KYCExtraction = _extraction_llm.invoke(extraction_messages)
@@ -141,88 +141,40 @@ checkPointer = MemorySaver()
 
 workflow = graph.compile(checkpointer=checkPointer)
 
-#TEST CASE 1: valid inputs
-
-# initial_state = {
-#     "id_card_num": "42101-1234567-1",
-#     "full_name": "John Doe",
-#     "phone_number": "0300-1234567",
-#     "issue_date": "2020-01-01",
-#     "expiry_date": "2028-01-01",
-#     "nationality": "Pakistani",
-#     "date_of_birth": "1990-01-01",
-#     "place_of_birth": "Karachi",
-#     "gender": "Male",
-#     "kyc_score": 0.0,
-#     "verification_status": "",
-#     "human_decision": "",
-#     "rejection_reason": "",
-#     "notification_message": "",
-#     "kyc_status": "",
-#     "messages": []
-# }
-
-# config = {"configurable": {"thread_id": "kyc-test-1"}}
-# result = workflow.invoke(initial_state, config=config)
-# print(result)
-
-
-
-
-#TEST CASE 2: human review 
-
-# initial_state = {
-#     "id_card_num": "42201-5544332-7",  # Fatima Ali
-#     "full_name": "Fatima Ali",
-#     "phone_number": "0300-1234567",
-#     "issue_date": "2020-01-01",
-#     "expiry_date": "2028-01-01",
-#     "nationality": "Pakistani",
-#     "date_of_birth": "1990-01-01",
-#     "place_of_birth": "Karachi",
-#     "gender": "Male",
-#     "kyc_score": 0.0,
-#     "verification_status": "",
-#     "human_decision": "",
-#     "rejection_reason": "",
-#     "notification_message": "",
-#     "kyc_status": "",
-#     "messages": []
-# }
-# config2 = {"configurable": {"thread_id": "kyc-test-2b"}}
-# result = workflow.invoke(initial_state, config=config2)
-# result = workflow.invoke(Command(resume="reject"), config=config2)
-# print("Score:", result['kyc_score'])
-# print("Status:", result['verification_status'])
-# print("Notification:", result['notification_message'])
-# print("Human Decision:", result['human_decision'])
-# print("REJECTED:", result['notification_message'])
-
-
-
-
 if __name__ == "__main__":
-    #TEST CASE 3:
+    # 1. Setup the High-Risk Identity
     initial_state = {
-        "id_card_num": "00000-0000000-0",
-        "full_name": "Nobody",
-        "phone_number": "0300-1234567",
-        "issue_date": "2020-01-01",
-        "expiry_date": "2028-01-01",
-        "nationality": "Pakistani",
-        "date_of_birth": "1990-01-01",
-        "place_of_birth": "Karachi",
-        "gender": "Male",
+        "id_card_num": "88888-7777777-1",
+        "full_name": "Audit Test User",
+        "phone_number": "0311-9999999",
+        "nationality": "Afghanistan", # High-risk country
         "kyc_score": 0.0,
-        "verification_status": "",
-        "human_decision": "",
-        "rejection_reason": "",
-        "notification_message": "",
-        "kyc_status": "",
         "messages": []
     }
-    config3 = {"configurable": {"thread_id": "kyc-test-3"}}
-    result = workflow.invoke(initial_state, config=config3)
-    print("Score:", result['kyc_score'])
-    print("Status:", result['verification_status'])
-    print("Notification:", result['notification_message'])
+    
+    config = {"configurable": {"thread_id": "audit-v1-test"}}
+
+    # --- PHASE A: AI Extraction & Initial Scoring ---
+    print("\n--- PHASE 1: AI SCORING & FLAG ---")
+    result = workflow.invoke(initial_state, config=config)
+    
+    # Check if the graph correctly paused
+    print(f"Current Status in State: {result.get('verification_status')}")
+    print(f"AI Score: {result.get('kyc_score')}")
+
+    # --- PHASE B: Human Review (Resuming) ---
+    # We simulate an admin looking at the conversation history and approving
+    print("\n--- PHASE 2: HUMAN OVERRIDE ---")
+    
+    # We pass the final decision. Note: human_review node will now call
+    # update_kyc_decision including the messages list.
+    resume_command = Command(resume={
+        "action": "approve", 
+        "reason": "Verified residential documents provided via physical mail."
+    })
+    
+    final_result = workflow.invoke(resume_command, config=config)
+
+    print("\n--- TEST COMPLETE ---")
+    print(f"Final Status: {final_result.get('verification_status')}")
+    print(f"Notification: {final_result.get('notification_message')}")

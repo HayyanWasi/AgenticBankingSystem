@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel
-from app.tools.kyc_tools import verify_id
+from tools.kyc_tools import verify_id
 from typing import Literal
 load_dotenv(override=True)
 

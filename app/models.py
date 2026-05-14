@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text
 from sqlalchemy.orm import declarative_base, relationship
 import datetime
 
@@ -72,5 +72,7 @@ class KYC(Base):
     verification_status = Column(String, default="pending")
     reject_reason = Column(String)
     last_updated = Column(DateTime, default=datetime.datetime.utcnow)
+    audit_trail = Column(Text, nullable=True)
+
 
     user = relationship("User", back_populates="kyc_record")

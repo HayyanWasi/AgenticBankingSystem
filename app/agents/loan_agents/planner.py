@@ -1,4 +1,4 @@
-from app.schemas.loan_agent_schema import LoanState
+from schemas.loan_agent_schema import LoanState
 
 def planner(state: LoanState)-> dict:
     loan_purpose = state['loan_purpose']

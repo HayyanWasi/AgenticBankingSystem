@@ -1,9 +1,9 @@
-from app.schemas.kyc_agent_schema import KYCState
-from app.database.db_tool import upsert_user_kyc_details
+from schemas.kyc_agent_schema import KYCState
+from database.db_tool import upsert_user_kyc_details
 
 
 
-from app.database.db_tool import upsert_user_kyc_details
+from database.db_tool import upsert_user_kyc_details
 
 def upsert_kyc_record(state: KYCState) -> dict:
     """Bridges the Graph State to the SQLite Database."""
@@ -30,11 +30,8 @@ def route_after_upsert(state: KYCState) -> str:
     status = state.get("kyc_status")
 
     if status == "success":
-        return "kyc_scoring_node"
-
+        return "kyc_agent"
     elif status == "failed":
-        return "ask_user_for_correction"
+        return "extract_kyc_details"
 
-    return "human_intervention_needed"
-
-    return "extract_kyc_details" # Go back to fix the data (e.g. wrong ID)
+    return "human_review"

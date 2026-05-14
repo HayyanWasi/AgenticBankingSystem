@@ -4,6 +4,8 @@ from models import Base
 DATABASE_URL = "sqlite:///bank_data.db"
 engine = create_engine(DATABASE_URL, echo=True)
 
+
+
 def build_database():
     print("Reading blueprints from models.py...")
     Base.metadata.create_all(bind=engine)

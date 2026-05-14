@@ -1,5 +1,5 @@
-from app.config.kyc_config import llm_with_tools
-from app.schemas.kyc_agent_schema import KYCState
+from config.kyc_config import llm_with_tools
+from schemas.kyc_agent_schema import KYCState
 from langchain_core.messages import SystemMessage, HumanMessage
 
 
@@ -13,15 +13,17 @@ def kyc_agent(state: KYCState):
         initial_messages = [
             SystemMessage(
                 content=f"""
-                You are a KYC agent. Verify customer ID:
-                {state['id_card_num']}, 
-                Name: {state['full_name']}. 
-                Score < 0.4 = reject, 
-                0.4-0.7 = human_review,
-                > 0.7 = approve."""
-            ),
+                You are a Senior Bank Compliance Officer. Assess the risk for:
+                Name: {state['full_name']}
+                ID: {state['id_card_num']}
+
+                ### PROTOCOL:
+                1. Call 'verify_customer_id' with id_num='{state['id_card_num']}' and full_name='{state['full_name']}'.
+                2. The tool returns a score (0.0-1.0) and a status. Report your findings clearly.
+                3. Do NOT call any other tools. Only 'verify_customer_id' is available."""
+                            ),
             HumanMessage(
-                content="verify this customer using your tools."
+                content="Please verify this customer now."
             )
         ]
         response = llm_with_tools.invoke(initial_messages)

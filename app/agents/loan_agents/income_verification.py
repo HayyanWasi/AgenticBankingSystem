@@ -1,4 +1,4 @@
-from app.schemas.loan_agent_schema import LoanState
+from schemas.loan_agent_schema import LoanState
 
 def income_verification(state: LoanState)->dict:
     loan_amount = state['loan_amount']

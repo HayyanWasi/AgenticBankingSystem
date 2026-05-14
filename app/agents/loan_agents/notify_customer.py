@@ -1,4 +1,4 @@
-from app.schemas.loan_agent_schema import LoanState
+from schemas.loan_agent_schema import LoanState
 
 def notify_customer(state: LoanState) -> dict:
     # Use .get() so it doesn't crash if the key doesn't exist yet

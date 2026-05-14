@@ -1,4 +1,4 @@
-from app.schemas.kyc_agent_schema import KYCState
+from schemas.kyc_agent_schema import KYCState
 
 def tools_condition(state: KYCState):
     messages = state['messages']

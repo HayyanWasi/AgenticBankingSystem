@@ -15,6 +15,7 @@ class KYCState(TypedDict, total=False):
     human_decision: Optional[str]
     reject_reason: Optional[str]       
     notification_message: Optional[str]
+    kyc_status: Optional[str]  # routing signal — must stay in schema
     
     # Graph execution history
     messages: Annotated[list, add_messages]
