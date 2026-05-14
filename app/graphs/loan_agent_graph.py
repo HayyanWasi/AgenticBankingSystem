@@ -16,7 +16,7 @@ import os
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 load_dotenv(override=True)
 
@@ -35,16 +35,24 @@ class LoanExtraction(BaseModel):
     loan_reason:      Optional[str]                                    = Field(None, description="Why the user wants the loan.")
 
 
-_extraction_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+_extraction_llm = ChatOpenAI(
+    model="google/gemini-2.0-flash-001",
     temperature=0,
-    google_api_key=os.getenv("GOOGLE_API_KEY2"),  # structured extraction — KEY2
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1",
+    default_headers={
+        "HTTP-Referer": "http://localhost:3000",
+    }
 ).with_structured_output(LoanExtraction)
 
-_conversation_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+_conversation_llm = ChatOpenAI(
+    model="google/gemini-2.0-flash-001",
     temperature=0.4,
-    google_api_key=os.getenv("GOOGLE_API_KEY1"),  # user-facing conversation — KEY1
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1",
+    default_headers={
+        "HTTP-Referer": "http://localhost:3000",
+    }
 )
 
 _REQUIRED = ["full_name", "id_card_num", "loan_amount", "loan_term_months", "monthly_income", "loan_purpose"]
@@ -58,31 +66,26 @@ def extract_loan_details(state: LoanState) -> dict:
     If any required fields are still missing after extraction, generates a natural
     conversational question and interrupts to wait for the user's reply.
     """
-    # Build a readable conversation string for the extraction LLM
-    conversation = "\n".join(
-        f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content}"
-        for m in state.get("messages", [])
-        if hasattr(m, "content")
-    )
-
-
-    latest_message = state.get("messages", [])[-1].content 
-
-    # Current known data
-    current_data = {f: state.get(f) for f in _REQUIRED if state.get(f)}
-    # Extract whatever is present in the conversation
-    extracted: LoanExtraction = _extraction_llm.invoke(
-    f"Current Application State: {current_data}\n"
-    f"New User Input: {latest_message}\n"
-    f"Update the application state based on the new input. "
-    f"If the user corrects an existing field, provide the new value."
-    )
-
-    # Merge into state — don't overwrite fields already collected
+    messages = state.get("messages", [])
     updates: dict = {}
-    for field, value in extracted.model_dump().items():
-        if value is not None and not state.get(field):
-            updates[field] = value
+
+    if messages:
+        latest_message = messages[-1].content 
+
+        # Current known data
+        current_data = {f: state.get(f) for f in _REQUIRED if state.get(f)}
+        # Extract whatever is present in the conversation
+        extracted: LoanExtraction = _extraction_llm.invoke(
+            f"Current Application State: {current_data}\n"
+            f"New User Input: {latest_message}\n"
+            f"Update the application state based on the new input. "
+            f"If the user corrects an existi ng field, provide the new value."
+        )
+
+        # Merge into state — don't overwrite fields already collected
+        for field, value in extracted.model_dump().items():
+            if value is not None and not state.get(field):
+                updates[field] = value
 
     # Check what's still missing after this extraction pass
     current = {**state, **updates}

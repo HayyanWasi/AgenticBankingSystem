@@ -1,16 +1,20 @@
 import os
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel
 from tools.kyc_tools import verify_id
 from typing import Literal
 load_dotenv(override=True)
 
-supervisor_generator_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+supervisor_generator_llm = ChatOpenAI(
+    model="google/gemini-2.0-flash-001",
     temperature=0.7,
-    google_api_key=os.getenv("GOOGLE_API_KEY2"),  # routing logic — KEY2
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1",
+    default_headers={
+        "HTTP-Referer": "http://localhost:3000",
+    }
 )
 class RouteDecision(BaseModel):
     destination: Literal["loan_agent", "payment_tranaction_process_agent", "kyc_agent"]

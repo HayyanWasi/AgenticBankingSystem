@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from typing import Optional
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 
 from schemas.payment_transaction_process_schema import TransferState, FraudCheck
 from agents.payment_transaction_process_agents.balance_check_function import balance_check
@@ -30,16 +30,24 @@ class TransferExtraction(BaseModel):
     receiver_account_number: str | None = Field(default=None, description="The account receiving money. Accept ANY string of characters or numbers.")
     money: float | None = Field(default=None, description="The numerical amount to transfer")
 
-_extraction_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
+_extraction_llm = ChatOpenAI(
+    model="google/gemini-2.0-flash-001",
     temperature=0,
-    google_api_key=os.getenv("GOOGLE_API_KEY2"),  # structured extraction — KEY2
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1",
+    default_headers={
+        "HTTP-Referer": "http://localhost:3000",
+    }
 ).with_structured_output(TransferExtraction)
 
-_conversation_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
+_conversation_llm = ChatOpenAI(
+    model="google/gemini-2.0-flash-001",
     temperature=0.4,
-    google_api_key=os.getenv("GOOGLE_API_KEY1"),  # user-facing conversation — KEY1
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1",
+    default_headers={
+        "HTTP-Referer": "http://localhost:3000",
+    }
 )
 
 from datetime import datetime

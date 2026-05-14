@@ -1,17 +1,21 @@
 from schemas.loan_agent_schema import LoanState
+from database.loan import create_loan_entry
 
-def planner(state: LoanState)-> dict:
-    loan_purpose = state['loan_purpose']
-    loan_amount = state['loan_amount']
+
+def planner(state: LoanState) -> dict:
+    loan_purpose = state.get('loan_purpose')
     
+    db_result = create_loan_entry(state)
+    new_id = db_result.get("loan_id")
+
     if loan_purpose == "personal":
         tasks = ["credit_verification", "income_verification"]
-        return {"tasks": tasks}
-    elif loan_purpose == "business":
+    elif loan_purpose in ["business", "mortgage"]:
         tasks = ["credit_verification", "income_verification", "collateral_evaluation"]
-        return {"tasks": tasks}
-    elif loan_purpose == "mortgage":
-        tasks = ["credit_verification", "income_verification", "collateral_evaluation"]
-        return {"tasks": tasks}
     else:
-        return {"tasks": ["ineligible"]} 
+        tasks = ["ineligible"]
+
+    return {
+        "tasks": tasks, 
+        "loan_id": new_id
+    }

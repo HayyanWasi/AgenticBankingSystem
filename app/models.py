@@ -35,21 +35,28 @@ class Account(Base):
     # Link transactions received by this account
     received_transactions = relationship("Transaction", foreign_keys='Transaction.to_account_id', back_populates="receiver")
 
+# In your models.py
 class Loan(Base):
-    __tablename__ = 'loans' 
-
+    __tablename__ = 'loans'
     loan_id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    amount = Column(Float, nullable=False)
-    term_months = Column(Integer, nullable=False)
-    interest_rate = Column(Float, nullable=False)
-    status = Column(String, default="pending")
+    
+    # Inputs
+    full_name = Column(String)
+    loan_amount = Column(Float)
     loan_purpose = Column(String)
     monthly_income = Column(Float)
-
-    # Relationships
+    loan_term_months = Column(Integer)
+    
+    # Logic Results (from your nodes)
+    credit_score = Column(Integer)
+    verified_income_ratio = Column(Float)
+    underwriting_decision = Column(String) # auto_approve, human_review, etc.
+    loan_status = Column(String)           # approved, rejected
+    notification_message = Column(Text)
+    
+    # Relationship
     borrower = relationship("User", back_populates="loans")
-
 class Transaction(Base):
     __tablename__ = "transactions"
 

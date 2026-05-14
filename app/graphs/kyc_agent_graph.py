@@ -144,10 +144,10 @@ workflow = graph.compile(checkpointer=checkPointer)
 if __name__ == "__main__":
     # 1. Setup the High-Risk Identity
     initial_state = {
-        "id_card_num": "88888-7777777-1",
-        "full_name": "Audit Test User",
-        "phone_number": "0311-9999999",
-        "nationality": "Afghanistan", # High-risk country
+        "id_card_num": "999-000-111",
+        "full_name": "Musa Al Sadr",
+        "phone_number": "+1-555-0199",
+        "nationality": "North Korea", # High-risk country
         "kyc_score": 0.0,
         "messages": []
     }
@@ -169,10 +169,11 @@ if __name__ == "__main__":
     # We pass the final decision. Note: human_review node will now call
     # update_kyc_decision including the messages list.
     resume_command = Command(resume={
-        "action": "approve", 
-        "reason": "Verified residential documents provided via physical mail."
-    })
-    
+    "action": "reject", 
+    "reason": "ID card format is invalid and nationality is on the prohibited list."
+})
+
+    # final_result = workflow.invoke(resume_command, config=config)
     final_result = workflow.invoke(resume_command, config=config)
 
     print("\n--- TEST COMPLETE ---")

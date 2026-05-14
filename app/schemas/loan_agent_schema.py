@@ -32,6 +32,7 @@ class LoanState(TypedDict):
     # workflow
     tasks: List[str]
     workflow_status: Literal['pending', 'running', 'completed', 'failed']
+    loan_id: Optional[int]
     
     # notification
     notification_message: str

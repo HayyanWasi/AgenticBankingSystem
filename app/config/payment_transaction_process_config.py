@@ -1,14 +1,18 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-generator_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+generator_llm = ChatOpenAI(
+    model="google/gemini-2.0-flash-001",
     temperature=0.7,
-    google_api_key=os.getenv("GOOGLE_API_KEY2") or os.getenv("GOOGLE_API_KEY"),
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1",
+    default_headers={
+        "HTTP-Referer": "http://localhost:3000",
+    }
 )
 
 class FruadCheck(BaseModel):
