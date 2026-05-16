@@ -1,7 +1,7 @@
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 # Adjust this import to point to where you actually compile your transfer_workflow
-from graphs.transfer_graph import transfer_workflow
+from app.graphs.transfer_graph import transfer_workflow
 
 def run_test():
     print("--- Starting Transfer Agent Pipeline Test ---")

@@ -1,4 +1,4 @@
-from schemas.kyc_agent_schema import KYCState
+from app.schemas.kyc_agent_schema import KYCState
 
 def score_condition(state: KYCState) -> str:
     status = state.get("verification_status")

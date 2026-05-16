@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel
-from tools.kyc_tools import verify_id
+from app.tools.kyc_tools import verify_id
 from typing import Literal
 load_dotenv(override=True)
 

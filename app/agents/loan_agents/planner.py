@@ -1,5 +1,5 @@
-from schemas.loan_agent_schema import LoanState
-from database.loan import create_loan_entry
+from app.schemas.loan_agent_schema import LoanState
+from app.database.loan import create_loan_entry
 
 
 def planner(state: LoanState) -> dict:

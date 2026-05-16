@@ -12,6 +12,7 @@ class User(Base):
     id_card_num = Column(String, unique=True, nullable=False)
     phone_number = Column(String)
     nationality = Column(String)
+    balance = Column(Float, default=0.0)
 
     # Relationships
     accounts = relationship("Account", back_populates="owner")
@@ -60,11 +61,13 @@ class Loan(Base):
 class Transaction(Base):
     __tablename__ = "transactions"
 
-    transaction_id = Column(Integer, primary_key=True)
+    transaction_id = Column(Integer, primary_key=True, index=True)
     from_account_id = Column(Integer, ForeignKey('accounts.account_id'), nullable=False)
     to_account_id = Column(Integer, ForeignKey('accounts.account_id'), nullable=False)
     amount = Column(Float, nullable=False)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    status = Column(String) 
+    
 
     # Relationships
     sender = relationship("Account", foreign_keys=[from_account_id], back_populates="sent_transactions")

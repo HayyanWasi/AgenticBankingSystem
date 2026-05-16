@@ -1,5 +1,5 @@
-from schemas.loan_agent_schema import LoanState
-from database.loan import update_loan_final_status
+from app.schemas.loan_agent_schema import LoanState
+from app.database.loan import update_loan_final_status
 
 def notify_customer(state: LoanState) -> dict:
     decision = state.get("underwriting_decision") 

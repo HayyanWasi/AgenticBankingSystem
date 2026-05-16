@@ -1,9 +1,9 @@
-from schemas.kyc_agent_schema import KYCState
-from database.db_tool import upsert_user_kyc_details
+from app.schemas.kyc_agent_schema import KYCState
+from app.database.db_tool import upsert_user_kyc_details
 
 
 
-from database.db_tool import upsert_user_kyc_details
+from app.database.db_tool import upsert_user_kyc_details
 
 def upsert_kyc_record(state: KYCState) -> dict:
     """Bridges the Graph State to the SQLite Database."""

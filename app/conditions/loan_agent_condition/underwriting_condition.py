@@ -1,4 +1,4 @@
-from schemas.loan_agent_schema import LoanState
+from app.schemas.loan_agent_schema import LoanState
 
 def route_underwriting(state: LoanState):
     decision = state["underwriting_decision"]

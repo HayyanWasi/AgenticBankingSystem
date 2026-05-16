@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
-from database.engine import engine
-from models import User, Account, Base
+from app.database.engine import engine
+from app.models import User, Account, Base
 
 def seed_database():
     # Rebuild tables just in case they were deleted
@@ -23,7 +23,7 @@ def seed_database():
         session.add(alice_account)
         
         # Create Bob (Receiver)
-        bob = User(full_name="Bob Jones", id_card_num="ID-222", phone_number="555-0200", nationality="UK")
+        bob = User(full_name="Bob Jones", id_card_num="ID-222", phone_number="555-0200", nationality="Afghanistan")
         session.add(bob)
         session.commit() # Commit to generate his user_id
         

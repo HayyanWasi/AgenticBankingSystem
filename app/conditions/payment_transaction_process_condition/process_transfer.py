@@ -1,6 +1,6 @@
-from schemas.payment_transaction_process_schema import TransferState
+from app.schemas.payment_transaction_process_schema import TransferState
 
-from database.db_tool import transfer_funds
+from app.database.db_tool import transfer_funds
 
 def process_transfer(state: TransferState):
     # Pull requirements from the state

@@ -1,13 +1,13 @@
 import os
-from agents.kyc_agents.notify_customer import notify_customer
-from agents.kyc_agents.human_review_kyc import human_review
-from agents.kyc_agents.kyc_agent import kyc_agent
-from agents.kyc_agents.kyc_agent_results import kyc_agent_results
-from schemas.kyc_agent_schema import KYCState
-from conditions.kyc_process_conditions.kyc_tool_conditions import tools_condition
-from conditions.kyc_process_conditions.score_conditions import score_condition
-from agents.kyc_agents.upsert_kycrecord import upsert_kyc_record, route_after_upsert
-from config.kyc_config import tool_node
+from app.agents.kyc_agents.notify_customer import notify_customer
+from app.agents.kyc_agents.human_review_kyc import human_review
+from app.agents.kyc_agents.kyc_agent import kyc_agent
+from app.agents.kyc_agents.kyc_agent_results import kyc_agent_results
+from app.schemas.kyc_agent_schema import KYCState
+from app.conditions.kyc_process_conditions.kyc_tool_conditions import tools_condition
+from app.conditions.kyc_process_conditions.score_conditions import score_condition
+from app.agents.kyc_agents.upsert_kycrecord import upsert_kyc_record, route_after_upsert
+from app.config.kyc_config import tool_node
 from pydantic import BaseModel, Field
 from typing import Optional
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field
 from langgraph.types import interrupt
 
 
-from config.kyc_config import kyc_conversation_llm as _conversation_llm, kyc_extraction_llm_base
+from app.config.kyc_config import kyc_conversation_llm as _conversation_llm, kyc_extraction_llm_base
 
 _REQUIRED_KYC = ["full_name", "id_card_num", "phone_number", "nationality"]
 
@@ -139,7 +139,7 @@ graph.add_edge("notify_customer", END)
 
 checkPointer = MemorySaver()
 
-workflow = graph.compile(checkpointer=checkPointer)
+kyc_app = graph.compile(checkpointer=checkPointer)
 
 if __name__ == "__main__":
     # 1. Setup the High-Risk Identity

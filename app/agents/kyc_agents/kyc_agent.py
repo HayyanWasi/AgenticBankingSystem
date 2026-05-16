@@ -1,5 +1,5 @@
-from config.kyc_config import llm_with_tools
-from schemas.kyc_agent_schema import KYCState
+from app.config.kyc_config import llm_with_tools
+from app.schemas.kyc_agent_schema import KYCState
 from langchain_core.messages import SystemMessage, HumanMessage
 
 

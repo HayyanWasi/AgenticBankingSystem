@@ -1,4 +1,4 @@
-from schemas.payment_transaction_process_schema import TransferState
+from app.schemas.payment_transaction_process_schema import TransferState
 
 def balance_check_condition(state: TransferState):
     

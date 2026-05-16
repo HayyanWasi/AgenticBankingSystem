@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
-from database.engine import engine
-from models import Loan, User
+from app.database.engine import engine
+from app.models import Loan, User
 from datetime import datetime
 
 

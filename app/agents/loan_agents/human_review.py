@@ -1,4 +1,4 @@
-from schemas.loan_agent_schema import LoanState
+from app.schemas.loan_agent_schema import LoanState
 from langgraph.types import interrupt
 
 

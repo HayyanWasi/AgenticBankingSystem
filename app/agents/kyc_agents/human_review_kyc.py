@@ -1,6 +1,6 @@
-from schemas.kyc_agent_schema import KYCState
+from app.schemas.kyc_agent_schema import KYCState
 from langgraph.types import interrupt
-from database.db_tool import update_kyc_decision
+from app.database.db_tool import update_kyc_decision
 
 
 

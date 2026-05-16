@@ -1,4 +1,4 @@
-from schemas.payment_transaction_process_schema import TransferState
+from app.schemas.payment_transaction_process_schema import TransferState
 
 def rejected(state: TransferState):
     # Fetch the specific reason, default to "manual review" if none is provided

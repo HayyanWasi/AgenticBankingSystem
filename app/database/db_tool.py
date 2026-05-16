@@ -1,8 +1,8 @@
 import json
 from datetime import datetime
 from sqlalchemy.orm import Session
-from database.engine import engine
-from models import Account, Transaction, User, KYC
+from app.database.engine import engine
+from app.models import Account, Transaction, User, KYC
 
 def get_account_balance(account_number: str) -> dict:
     """A strictly controlled tool for agents to check an account balance."""

@@ -7,7 +7,7 @@ from langchain.agents import create_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, AIMessage
 
-
+from app.config.privacy_policy_agent_config import privacy_policy_llm
 
 from .pipeline import RAG
 
@@ -35,13 +35,8 @@ prompt = (
     "explain the data, do so briefly and only based on the retrieved context."
 )
 
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash", 
-    google_api_key="AIzaSyBOiVcow1r8E35TlbV5KG6xpzXPiYO13Ds"
-     
-)
 agent = create_agent(
-    model=llm,
+    model=privacy_policy_llm,
     tools=[retrieve_content],
     system_prompt=prompt
 )

@@ -1,22 +1,42 @@
 from langchain_core.messages import HumanMessage
-from schemas.bank_manager import SupervisorState
+from app.schemas.bank_manager import SupervisorState
 
 from langgraph.graph.state import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 
-from graphs.kyc_agent_graph import workflow as kyc_graph
-from graphs.loan_agent_graph import loan_graph as loan_agent_graph
-from graphs.transfer_graph import transfer_workflow as transfer_agent_graph
-
-from config.supervisor_config import route_decision_llm
-
+from app.graphs.kyc_agent_graph import kyc_app as kyc_graph
+from app.graphs.loan_agent_graph import loan_app as loan_agent_graph
+from app.graphs.transfer_graph import transfer_workflow as transfer_agent_graph
+from app.graphs.privacy_agent_graph import privacy_policy_node
+from app.config.supervisor_config import route_decision_llm
 
 def supervisor_route(state: SupervisorState) -> dict:
-    last_message_content = state["messages"][-1].content
-    prompt = f"Act as a bank dispatcher. Route this user request to the correct department: {last_message_content}"
+    last_message = state["messages"][-1].content
+    
+    # Provide the LLM with the EXACT allowed node names
+    options = ["loan_agent", "payment_transaction_process_agent", "kyc_agent", "privacy_policy_agent", "END"]
+    
+    prompt = f"""
+    Act as a bank dispatcher. Route this user request: "{last_message}"
+    
+    User Query: {state['messages'][-1].content}
+    Allowed destinations: {options}
+    
+    If the user is just saying hi or thanks, route to END.
+    If the user wants a loan, route to loan_agent.
+    If the user wants to send money, route to payment_transaction_process_agent.
+    If the user mentions identity or verification, route to kyc_agent.
+    Route to 'privacy_policy_agent' if the user asks about:
+    - Privacy rules, data usage, terms and conditions, or bank policies.
+    """
+    
     response = route_decision_llm.invoke(prompt)
-    return {"next_route": response.destination}
+    
+    # Ensure the destination is valid
+    destination = response.destination if response.destination in options else "END"
+    
+    return {"next_route": destination}
 
 
 graph = StateGraph(SupervisorState)
@@ -25,6 +45,7 @@ graph.add_node("supervisor", supervisor_route)
 
 # Each sub-graph handles its own data extraction as its first node
 graph.add_node("loan_agent", loan_agent_graph)
+graph.add_node("privacy_policy_agent", privacy_policy_node)
 graph.add_node("payment_transaction_process_agent", transfer_agent_graph)
 graph.add_node("kyc_agent", kyc_graph)
 

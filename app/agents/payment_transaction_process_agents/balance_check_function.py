@@ -1,5 +1,5 @@
-from schemas.payment_transaction_process_schema import TransferState
-from database.db_tool import get_account_balance
+from app.schemas.payment_transaction_process_schema import TransferState
+from app.database.db_tool import get_account_balance
 
 def balance_check(state: TransferState):
     sender_account = state.get('sender_account_number')

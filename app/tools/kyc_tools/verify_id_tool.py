@@ -1,6 +1,6 @@
 from langchain.tools import tool
-from schemas.kyc_agent_schema import UserContext
-from database.db_tool import get_user_kyc_status
+from app.schemas.kyc_agent_schema import UserContext
+from app.database.db_tool import get_user_kyc_status
 
 HIGH_RISK_COUNTRIES = ["North Korea", "Iran", "Afghanistan", "Ukraine", "Syria"]
 

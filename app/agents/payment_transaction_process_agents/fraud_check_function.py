@@ -1,5 +1,5 @@
 from datetime import datetime
-from schemas.payment_transaction_process_schema import TransferState
+from app.schemas.payment_transaction_process_schema import TransferState
 
 def fraud_check(state: TransferState):
     # 1. Safely extract values to prevent KeyErrors and handle explicit None values
