@@ -26,7 +26,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 PERSIST_DIR = PROJECT_ROOT / "chroma"
 
 # ── Embedding ──────────────────────────────────────────
-EMBEDDING_MODEL = "all-MiniLM-L6-V2"
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 # ── Chunking ───────────────────────────────────────────
 CHUNK_SIZE = 600
