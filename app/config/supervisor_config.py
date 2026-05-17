@@ -17,7 +17,12 @@ supervisor_generator_llm = ChatOpenAI(
     }
 )
 class RouteDecision(BaseModel):
-    destination: Literal["loan_agent", "payment_tranaction_process_agent", "kyc_agent"]
-
+    destination: Literal[
+        "loan_agent", 
+        "payment_transaction_process_agent", 
+        "kyc_agent", 
+        "privacy_policy_agent", 
+        "END"
+    ]   
 
 route_decision_llm = supervisor_generator_llm.with_structured_output(RouteDecision)

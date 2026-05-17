@@ -30,29 +30,32 @@ llm = ChatOpenAI(
     }
 )
 
-
-loader = PyPDFLoader(r"D:\Hayyan\Projects\AgenticBanking\data\privacy_policy.pdf")
-docs = loader.load()
-
-len(docs)
-
-
-splitter = RecursiveCharacterTextSplitter(chunk_size = 1000, chunk_overlap=200)
-chunks = splitter.split_documents(docs)
-
-len(chunks)
-
+PERSIST_DIR = r"D:\Hayyan\Projects\AgenticBanking\chroma"
 model_name = "sentence-transformers/all-MiniLM-L6-v2"
 embeddings = HuggingFaceEmbeddings(model_name=model_name)
 
-# Create vector store from chunks using ChromaDB
-vector_db = Chroma.from_documents(
-    documents=chunks, 
-    embedding=embeddings,
-    persist_directory=r"D:\Hayyan\Projects\AgenticBanking\chroma"
-)
+if os.path.exists(PERSIST_DIR):
+    print(f"Loading existing Vector DB from {PERSIST_DIR}...")
+    vector_db = Chroma(
+        persist_directory=str(PERSIST_DIR), 
+        embedding_function=embeddings
+    )
+else:
+    print("No existing DB found. Ingesting PDF...")
+    loader = PyPDFLoader(r"D:\Hayyan\Projects\AgenticBanking\data\privacy_policy.pdf")
+    docs = loader.load()
+    
+    splitter = RecursiveCharacterTextSplitter(chunk_size = 1000, chunk_overlap=200)
+    chunks = splitter.split_documents(docs)
+    
+    # Create vector store from chunks using ChromaDB
+    vector_db = Chroma.from_documents(
+        documents=chunks, 
+        embedding=embeddings,
+        persist_directory=PERSIST_DIR
+    )
+
 retriever = vector_db.as_retriever(search_type='similarity', search_kwargs={'k':4})
-# print(retriever.invoke("how you do Sharing with Third Parties"))
 
 @tool
 def rag_tool(query):
@@ -97,9 +100,9 @@ graph.add_edge(START, 'chat_node')
 graph.add_conditional_edges('chat_node', tools_condition)
 graph.add_edge('tools', 'chat_node')
 
-chatbot = graph.compile()
+rag_bot= graph.compile()
 
-def main_test():
+def main():
     exit_list = ['exit', 'quit', 'thanks', 'thank you']
     print("Privacy Policy Agent is ready. Type 'exit' to quit.")
     while True:
@@ -110,7 +113,7 @@ def main_test():
             print("Goodbye!")
             break
             
-        result = chatbot.invoke({
+        result = rag_bot.invoke({
             "messages": [
                 SystemMessage(
                     content="Use the pdf note, Explain if user wants, make concise if user wants, answer users question but must be related to pdf's content"
@@ -121,4 +124,4 @@ def main_test():
         print(f"AI: {result['messages'][-1].content}\n")
 
 if __name__ == "__main__":
-    main_test()
+    main() 

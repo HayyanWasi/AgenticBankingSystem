@@ -13,17 +13,19 @@ async def chat_with_bank(
     
     # Check if the session is currently paused in a sub-graph
     snapshot = master_graph.get_state(config)
-    
+
     if snapshot.next:
-        # Resume the specific sub-graph (KYC, Loan, or Transfer)
+        # 1. Resume the graph
         result = master_graph.invoke(Command(resume=message), config)
     else:
-        # Start a fresh supervisor evaluation
+        # 2. Fresh start
         result = master_graph.invoke({"messages": [("user", message)]}, config)
 
-    ai_reply = result["messages"][-1].content
-    
-    return {
-        "reply": ai_reply,
-        "is_waiting": bool(master_graph.get_state(config).next)
-    }
+    # 3. Check if we just hit ANOTHER interrupt (e.g., asked for the next field)
+    new_snapshot = master_graph.get_state(config)
+    if new_snapshot.tasks and new_snapshot.tasks[0].interrupts:
+        # Get the question from the interrupt itself
+        ai_reply = new_snapshot.tasks[0].interrupts[0].value
+    else:
+        # Get the final message from the LLM
+        ai_reply = result["messages"][-1].content

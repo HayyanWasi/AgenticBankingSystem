@@ -11,38 +11,30 @@ from app.graphs.transfer_graph import transfer_workflow as transfer_agent_graph
 from app.graphs.privacy_agent_graph import privacy_policy_node
 from app.config.supervisor_config import route_decision_llm
 
+
 def supervisor_route(state: SupervisorState) -> dict:
     last_message = state["messages"][-1].content
-    
-    # Provide the LLM with the EXACT allowed node names
-    options = ["loan_agent", "payment_transaction_process_agent", "kyc_agent", "privacy_policy_agent", "END"]
     
     prompt = f"""
     Act as a bank dispatcher. Route this user request: "{last_message}"
     
-    User Query: {state['messages'][-1].content}
-    Allowed destinations: {options}
-    
-    If the user is just saying hi or thanks, route to END.
-    If the user wants a loan, route to loan_agent.
-    If the user wants to send money, route to payment_transaction_process_agent.
-    If the user mentions identity or verification, route to kyc_agent.
-    Route to 'privacy_policy_agent' if the user asks about:
-    - Privacy rules, data usage, terms and conditions, or bank policies.
+    - If they ask about policies, sharing, or privacy: privacy_policy_agent
+    - If they ask for a loan: loan_agent
+    - If they want to send money: payment_transaction_process_agent
+    - If they mention ID/Verification: kyc_agent
+    - If it's a greeting or closing: END
     """
     
     response = route_decision_llm.invoke(prompt)
     
-    # Ensure the destination is valid
-    destination = response.destination if response.destination in options else "END"
+    destination = response.destination 
+
+    print(f"--- [ROUTING] Decision: {destination} ---")
+    return {"next_route": destination}  
     
-    return {"next_route": destination}
-
-
 graph = StateGraph(SupervisorState)
 
 graph.add_node("supervisor", supervisor_route)
-
 # Each sub-graph handles its own data extraction as its first node
 graph.add_node("loan_agent", loan_agent_graph)
 graph.add_node("privacy_policy_agent", privacy_policy_node)
@@ -54,6 +46,7 @@ graph.add_conditional_edges("supervisor", lambda state: state["next_route"])
 graph.add_edge("loan_agent", END)
 graph.add_edge("payment_transaction_process_agent", END)
 graph.add_edge("kyc_agent", END)
+graph.add_edge("privacy_policy_agent", END)
 
 master_graph = graph.compile(checkpointer=MemorySaver())
 
