@@ -30,7 +30,8 @@ llm = ChatOpenAI(
     }
 )
 
-PERSIST_DIR = r"D:\Hayyan\Projects\AgenticBanking\chroma"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+PERSIST_DIR = os.path.join(BASE_DIR, "chroma")
 model_name = "sentence-transformers/all-MiniLM-L6-v2"
 embeddings = HuggingFaceEmbeddings(model_name=model_name)
 
@@ -42,7 +43,8 @@ if os.path.exists(PERSIST_DIR):
     )
 else:
     print("No existing DB found. Ingesting PDF...")
-    loader = PyPDFLoader(r"D:\Hayyan\Projects\AgenticBanking\data\privacy_policy.pdf")
+    pdf_path = os.path.join(BASE_DIR, "data", "privacy_policy.pdf")
+    loader = PyPDFLoader(pdf_path)
     docs = loader.load()
     
     splitter = RecursiveCharacterTextSplitter(chunk_size = 1000, chunk_overlap=200)

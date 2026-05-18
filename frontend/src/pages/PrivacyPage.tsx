@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import { chatWithPrivacy } from '../utils/api';
+import { getThreadId } from '../utils/threadId';
 
 interface Message {
   role: 'user' | 'ai';
@@ -11,6 +13,7 @@ export default function PrivacyPage() {
     { role: 'ai', text: 'Hello! I\'m your AI Privacy Agent. I can help you understand our privacy policies, manage your data preferences, and answer questions about how your information is protected. What would you like to know?', timestamp: 'Just now' },
   ]);
   const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEnd = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,26 +27,31 @@ export default function PrivacyPage() {
     'What data do you collect?',
   ];
 
-  const aiResponses: Record<string, string> = {
-    'How is my data stored?': 'Your data is stored using AES-256 encryption at rest and TLS 1.3 for data in transit. All sensitive information is segmented across geographically distributed servers with zero-knowledge architecture. Our AI agents process data in isolated environments with no persistent storage of raw personal data.',
-    'Who has access to my info?': 'Access to your data follows a strict principle of least privilege. Only verified AI agents with specific task authorization can access relevant data segments. Human employees require multi-factor authentication and audit trails are maintained for every access event. You can view the full access log in your Security Dashboard.',
-    'How do I delete my account?': 'You can request account deletion through Settings → Account → Delete Account. Per our policy, all personal data will be purged within 30 days. Certain anonymized transaction records may be retained for regulatory compliance (up to 7 years) but will contain no personally identifiable information.',
-    'What data do you collect?': 'We collect: (1) Identity data — name, email, government ID for KYC. (2) Financial data — transaction history, account balances. (3) Behavioral data — login patterns for security. (4) Device data — IP, browser type for fraud prevention. You can control data sharing preferences in Settings → Privacy.',
-  };
-
-  const handleSend = (text?: string) => {
+  const handleSend = async (text?: string) => {
     const msg = text || input;
-    if (!msg.trim()) return;
+    if (!msg.trim() || isLoading) return;
 
     const userMsg: Message = { role: 'user', text: msg, timestamp: 'Just now' };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
+    setIsLoading(true);
 
-    setTimeout(() => {
-      const response = aiResponses[msg] || 'Thank you for your question. Based on our privacy policy, your data is protected under strict security protocols. I\'ve flagged this for a detailed review. Is there anything else you\'d like to know about your data privacy?';
-      const aiMsg: Message = { role: 'ai', text: response, timestamp: 'Just now' };
+    try {
+      // Send message with thread_id to the backend
+      const data = await chatWithPrivacy(msg);
+      const aiMsg: Message = { role: 'ai', text: data.reply, timestamp: 'Just now' };
       setMessages(prev => [...prev, aiMsg]);
-    }, 800);
+    } catch (err) {
+      const errorMsg: Message = {
+        role: 'ai',
+        text: 'Sorry, I encountered an error connecting to the server. Please try again.',
+        timestamp: 'Just now',
+      };
+      setMessages(prev => [...prev, errorMsg]);
+      console.error('Privacy chat error:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -58,6 +66,12 @@ export default function PrivacyPage() {
           <span className="material-symbols-outlined text-secondary animate-pulse-glow" style={{ fontSize: '14px', fontVariationSettings: "'FILL' 1" }}>security</span>
           <span className="font-[var(--font-mono)] text-[11px] text-secondary tracking-[0.05em]">Privacy Agent Online</span>
         </div>
+      </div>
+
+      {/* Thread ID indicator */}
+      <div className="flex items-center gap-[6px] mb-[8px] px-[4px]">
+        <span className="material-symbols-outlined text-outline-variant" style={{ fontSize: '12px' }}>fingerprint</span>
+        <span className="font-[var(--font-mono)] text-[10px] text-outline-variant tracking-[0.05em]">Session: {getThreadId().slice(0, 8)}...</span>
       </div>
 
       {/* Chat Area */}
@@ -83,6 +97,21 @@ export default function PrivacyPage() {
               </div>
             </div>
           ))}
+          {/* Loading indicator */}
+          {isLoading && (
+            <div className="flex gap-[12px] animate-fade-in-up">
+              <div className="w-[32px] h-[32px] rounded-full flex items-center justify-center shrink-0 bg-primary-container text-secondary">
+                <span className="material-symbols-outlined animate-spin" style={{ fontSize: '16px', fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
+              </div>
+              <div className="bg-surface-container-low rounded-[16px] px-[16px] py-[12px]">
+                <div className="flex gap-[4px]">
+                  <span className="w-[6px] h-[6px] bg-on-surface-variant/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-[6px] h-[6px] bg-on-surface-variant/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-[6px] h-[6px] bg-on-surface-variant/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                </div>
+              </div>
+            </div>
+          )}
           <div ref={messagesEnd} />
         </div>
 
@@ -92,7 +121,8 @@ export default function PrivacyPage() {
             <button
               key={q}
               onClick={() => handleSend(q)}
-              className="px-[12px] py-[6px] bg-surface-container-high rounded-full font-[var(--font-mono)] text-[11px] text-on-surface-variant tracking-[0.05em] whitespace-nowrap hover:bg-secondary-container hover:text-secondary transition-colors cursor-pointer border-none shrink-0"
+              disabled={isLoading}
+              className="px-[12px] py-[6px] bg-surface-container-high rounded-full font-[var(--font-mono)] text-[11px] text-on-surface-variant tracking-[0.05em] whitespace-nowrap hover:bg-secondary-container hover:text-secondary transition-colors cursor-pointer border-none shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {q}
             </button>
@@ -107,8 +137,13 @@ export default function PrivacyPage() {
               placeholder="Ask about your privacy..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              disabled={isLoading}
             />
-            <button type="submit" className="w-[44px] h-[44px] bg-secondary text-on-secondary rounded-[12px] flex items-center justify-center cursor-pointer border-none hover:bg-on-surface-variant transition-colors shrink-0">
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-[44px] h-[44px] bg-secondary text-on-secondary rounded-[12px] flex items-center justify-center cursor-pointer border-none hover:bg-on-surface-variant transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>send</span>
             </button>
           </form>

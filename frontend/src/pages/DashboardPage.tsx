@@ -1,4 +1,7 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getDashboard } from '../utils/api';
+import type { DashboardData } from '../utils/api';
 
 const quickActions = [
   { icon: 'swap_horiz', label: 'Transfer', path: '/transfer', color: 'text-secondary' },
@@ -7,16 +10,26 @@ const quickActions = [
   { icon: 'security', label: 'Privacy', path: '/privacy', color: 'text-secondary' },
 ];
 
-const recentTransactions = [
-  { icon: 'storefront', name: 'Whole Foods', type: 'Groceries', amount: '-$142.50', status: 'AI Verified', statusIcon: 'check', statusColor: 'text-secondary' },
-  { icon: 'person', name: 'Sarah Jenkins', type: 'Transfer', amount: '-$500.00', status: 'Pending Review', statusIcon: 'schedule', statusColor: 'text-on-surface-variant' },
-  { icon: 'bolt', name: 'Electric Co.', type: 'Utilities', amount: '-$84.20', status: 'AI Verified', statusIcon: 'check', statusColor: 'text-secondary' },
-  { icon: 'local_cafe', name: 'Blue Bottle Coffee', type: 'Dining', amount: '-$12.80', status: 'AI Verified', statusIcon: 'check', statusColor: 'text-secondary' },
-  { icon: 'directions_car', name: 'Shell Gas Station', type: 'Transportation', amount: '-$65.40', status: 'AI Verified', statusIcon: 'check', statusColor: 'text-secondary' },
-];
-
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const [account, setAccount] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const data = await getDashboard(1); // Hardcoded Alice Protocol
+        setAccount(data);
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  const transactions = account?.recent_transactions || [];
 
   return (
     <div className="p-[20px] md:p-[40px] max-w-[1200px] mx-auto">
@@ -24,7 +37,9 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between mb-[32px]">
         <div>
           <p className="font-[var(--font-mono)] text-[12px] text-on-surface-variant tracking-[0.05em] uppercase mb-[4px]">Welcome back</p>
-          <h1 className="font-[var(--font-headline)] text-[24px] md:text-[32px] font-semibold text-on-surface tracking-tight">Alex Rivers</h1>
+          <h1 className="font-[var(--font-headline)] text-[24px] md:text-[32px] font-semibold text-on-surface tracking-tight">
+            {loading ? "Loading..." : account?.full_name || "Guest"}
+          </h1>
         </div>
         <div className="flex items-center gap-[12px]">
           <button className="w-[40px] h-[40px] rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer border-none">
@@ -32,7 +47,7 @@ export default function DashboardPage() {
           </button>
           <div className="w-[40px] h-[40px] rounded-full bg-primary-container border-2 border-secondary/30 overflow-hidden">
             <img
-              alt="Alex Rivers"
+              alt="Profile"
               className="w-full h-full object-cover"
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuDa3vfk84khTwpW8K7Mg7J5y_tcKxIJmTEPtfvNiLV1yljirvJtLBSNaNhKDMt4dJrzSPIv6_sfpO-wcRVx0SIRUbuqHnMjBXPy-eb2B7hf0PHPzJYPMbODQut5IqH5mFK5ZRtj96zK3fiY0v4bqQx1304AxGm1C2rQxSSisrqkfOXXes-81_dgXm6qGlBzNNddCyn0a13_9xALRgvvT-F66hFF0MnnaDKlN9Ad0BVtOF51dTpWtie8B5x1B0QU0jQ34Egk9l4y0MH9"
             />
@@ -48,7 +63,9 @@ export default function DashboardPage() {
             <span className="material-symbols-outlined text-secondary" style={{ fontSize: '16px', fontVariationSettings: "'FILL' 1" }}>account_balance_wallet</span>
             <span className="font-[var(--font-mono)] text-[12px] text-on-surface-variant tracking-[0.05em] uppercase">Total Balance</span>
           </div>
-          <h2 className="font-[var(--font-headline)] text-[36px] md:text-[48px] font-bold text-on-surface tracking-tight leading-tight">$24,856.90</h2>
+          <h2 className="font-[var(--font-headline)] text-[36px] md:text-[48px] font-bold text-on-surface tracking-tight leading-tight">
+            ${loading ? "..." : (account?.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </h2>
           <div className="flex items-center gap-[4px] mt-[8px]">
             <span className="material-symbols-outlined text-secondary" style={{ fontSize: '16px' }}>trending_up</span>
             <span className="font-[var(--font-mono)] text-[12px] text-secondary tracking-[0.05em]">+2.4% this month</span>
@@ -84,7 +101,7 @@ export default function DashboardPage() {
             {[
               { name: 'Fraud Monitor', status: 'Active', icon: 'shield' },
               { name: 'Loan Processor', status: 'Idle', icon: 'payments' },
-              { name: 'KYC Verifier', status: 'Active', icon: 'verified_user' },
+              { name: 'KYC Verifier', status: account?.kyc_status === 'verified' ? 'Completed' : account?.kyc_status === 'pending' ? 'Pending' : 'Active', icon: 'verified_user' },
               { name: 'Privacy Agent', status: 'Standby', icon: 'security' },
             ].map((agent) => (
               <div key={agent.name} className="flex items-center justify-between py-[10px] border-b border-outline-variant/10 last:border-none">
@@ -93,8 +110,9 @@ export default function DashboardPage() {
                   <span className="font-[var(--font-body)] text-[14px] text-on-surface">{agent.name}</span>
                 </div>
                 <span className={`font-[var(--font-mono)] text-[10px] px-[8px] py-[3px] rounded-full tracking-[0.05em] ${
-                  agent.status === 'Active' ? 'bg-secondary-container/40 text-secondary' :
+                  agent.status === 'Active' || agent.status === 'Completed' ? 'bg-secondary-container/40 text-secondary' :
                   agent.status === 'Idle' ? 'bg-surface-container-high text-on-surface-variant' :
+                  agent.status === 'Pending' ? 'bg-error-container/40 text-error' :
                   'bg-tertiary-container/40 text-tertiary'
                 }`}>
                   {agent.status}
@@ -114,7 +132,9 @@ export default function DashboardPage() {
               </div>
               <button onClick={() => navigate('/transactions')} className="font-[var(--font-mono)] text-[12px] text-secondary tracking-[0.05em] bg-transparent border-none cursor-pointer hover:underline">View All</button>
             </div>
-            {recentTransactions.map((tx, i) => (
+            {transactions.length === 0 && !loading ? (
+              <p className="font-[var(--font-body)] text-[14px] text-on-surface-variant text-center py-[20px]">No recent transactions found.</p>
+            ) : transactions.map((tx, i) => (
               <div key={i} className="flex items-center justify-between py-[12px] border-b border-outline-variant/10 last:border-none hover:bg-surface-container-low/30 rounded-[8px] px-[8px] transition-colors">
                 <div className="flex items-center gap-[12px]">
                   <div className="w-[36px] h-[36px] bg-primary-container rounded-[10px] flex items-center justify-center">

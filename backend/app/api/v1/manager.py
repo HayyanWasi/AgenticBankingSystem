@@ -11,6 +11,7 @@ async def chat_with_bank(
 ):
     config = {"configurable": {"thread_id": thread_id}}
     
+        
     # Check if the session is currently paused in a sub-graph
     snapshot = master_graph.get_state(config)
 
@@ -29,3 +30,11 @@ async def chat_with_bank(
     else:
         # Get the final message from the LLM
         ai_reply = result["messages"][-1].content
+        
+    is_waiting = bool(new_snapshot.tasks and new_snapshot.tasks[0].interrupts)
+    
+    return {
+        "reply": ai_reply,
+        "is_waiting": is_waiting,
+        "thread_id": thread_id
+    }
