@@ -81,6 +81,7 @@ graph TD
 
 ### 3. Loan Processing Agent Graph
 Calculates risk tiers, debt-to-income ratios, and handles complex underwriting parallelization.
+
 <img width="1414" height="449" alt="image" src="https://github.com/user-attachments/assets/004bc06e-9414-471f-8d9c-fa1c703211fc" />
 
 ```mermaid
