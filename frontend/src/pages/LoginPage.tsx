@@ -6,11 +6,71 @@ export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [idCardNum, setIdCardNum] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    navigate('/dashboard');
+    setError(null);
+    setSuccessMessage(null);
+
+    if (!email.trim() || !password.trim() || (!isLogin && (!fullName.trim() || !idCardNum.trim()))) {
+      setError('Please fill in all required fields.');
+      return;
+    }
+
+    try {
+      if (isLogin) {
+        const res = await fetch('/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.detail ?? `Login failed: ${res.status}`);
+        }
+
+        const response = await res.json();
+        localStorage.setItem('access_token', response.access_token);
+        localStorage.setItem('user_id', String(response.user_id));
+
+        // Fetch dashboard to get account_number and persist it
+        try {
+          const dashRes = await fetch(`/api/v1/user/dashboard/${response.user_id}`);
+          if (dashRes.ok) {
+            const dashData = await dashRes.json();
+            localStorage.setItem('account_number', dashData.account_number ?? '');
+          }
+        } catch { /* ignore — transfer page handles missing account */ }
+
+        navigate('/dashboard');
+      } else {
+        const res = await fetch('/api/v1/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            password,
+            full_name: fullName,
+            id_card_num: idCardNum,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.detail ?? `Registration failed: ${res.status}`);
+        }
+
+        setSuccessMessage('Account created successfully. Please log in.');
+        setIsLogin(true);
+      }
+    } catch (err: any) {
+      setError(err?.message ?? 'Authentication failed.');
+    }
   };
 
   return (
@@ -74,6 +134,17 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {error && (
+            <div className="mb-[16px] rounded-[12px] border border-error/20 bg-error-container/10 p-[14px] text-error text-[14px]">
+              {error}
+            </div>
+          )}
+          {successMessage && (
+            <div className="mb-[16px] rounded-[12px] border border-secondary/20 bg-secondary-container/10 p-[14px] text-secondary text-[14px]">
+              {successMessage}
+            </div>
+          )}
+
           {/* Divider */}
           <div className="flex items-center gap-[16px] mb-[16px]">
             <div className="h-[1px] flex-1 bg-outline-variant/30"></div>
@@ -84,19 +155,34 @@ export default function LoginPage() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="flex flex-col gap-[8px]">
             {!isLogin && (
-              <div className="flex flex-col gap-[4px] animate-fade-in-up">
-                <label className="font-[var(--font-mono)] text-[12px] text-on-surface-variant px-[4px] tracking-[0.05em]">Full Name</label>
-                <div className="relative">
-                  <span className="material-symbols-outlined absolute left-[12px] top-1/2 -translate-y-1/2 text-outline-variant" style={{ fontSize: '20px' }}>person</span>
-                  <input
-                    className="w-full bg-surface-bright border border-outline-variant rounded-[8px] py-[12px] pl-[40px] pr-[16px] font-[var(--font-body)] text-[16px] text-on-surface focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/20 transition-all placeholder:text-outline-variant"
-                    placeholder="Alex Rivers"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
+              <>
+                <div className="flex flex-col gap-[4px] animate-fade-in-up">
+                  <label className="font-[var(--font-mono)] text-[12px] text-on-surface-variant px-[4px] tracking-[0.05em]">Full Name</label>
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-[12px] top-1/2 -translate-y-1/2 text-outline-variant" style={{ fontSize: '20px' }}>person</span>
+                    <input
+                      className="w-full bg-surface-bright border border-outline-variant rounded-[8px] py-[12px] pl-[40px] pr-[16px] font-[var(--font-body)] text-[16px] text-on-surface focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/20 transition-all placeholder:text-outline-variant"
+                      placeholder="Alex Rivers"
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                    />
+                  </div>
                 </div>
-              </div>
+                <div className="flex flex-col gap-[4px] animate-fade-in-up">
+                  <label className="font-[var(--font-mono)] text-[12px] text-on-surface-variant px-[4px] tracking-[0.05em]">ID Card Number</label>
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-[12px] top-1/2 -translate-y-1/2 text-outline-variant" style={{ fontSize: '20px' }}>badge</span>
+                    <input
+                      className="w-full bg-surface-bright border border-outline-variant rounded-[8px] py-[12px] pl-[40px] pr-[16px] font-[var(--font-body)] text-[16px] text-on-surface focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/20 transition-all placeholder:text-outline-variant"
+                      placeholder="1234 5678 9012"
+                      type="text"
+                      value={idCardNum}
+                      onChange={(e) => setIdCardNum(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </>
             )}
 
             <div className="flex flex-col gap-[4px]">

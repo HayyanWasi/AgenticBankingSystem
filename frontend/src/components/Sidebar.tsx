@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-
+import { getDashboard } from '../utils/api';
 const navItems = [
   { icon: 'dashboard', label: 'Dashboard', path: '/dashboard' },
   { icon: 'payments', label: 'Loans', path: '/loans' },
@@ -16,6 +17,27 @@ const bottomItems = [
 
 export default function Sidebar() {
   const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    async function checkAdmin() {
+      try {
+        const userId = Number(localStorage.getItem('user_id'));
+        if (userId) {
+          const data = await getDashboard(userId);
+          setIsAdmin(data.is_admin);
+        }
+      } catch (err) {
+        console.error("Failed to check admin status:", err);
+      }
+    }
+    checkAdmin();
+  }, []);
+
+  const dynamicNavItems = [...navItems];
+  if (isAdmin) {
+    dynamicNavItems.push({ icon: 'admin_panel_settings', label: 'Admin Portal', path: '/admin' });
+  }
 
   return (
     <>
@@ -32,7 +54,7 @@ export default function Sidebar() {
 
           {/* Nav Items */}
           <nav className="flex flex-col gap-[4px]">
-            {navItems.map((item) => (
+            {dynamicNavItems.map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}
@@ -82,7 +104,7 @@ export default function Sidebar() {
 
       {/* Mobile Bottom Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-container-lowest/90 backdrop-blur-[16px] border-t border-outline-variant/20 flex justify-around py-[8px] px-[4px]">
-        {navItems.slice(0, 5).map((item) => (
+        {dynamicNavItems.slice(0, 5).map((item) => (
           <NavLink
             key={item.path}
             to={item.path}

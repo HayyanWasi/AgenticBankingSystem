@@ -18,9 +18,11 @@ dependencies = [
     "langchain-openai>=1.2.1",
     "langchain-openrouter>=0.1.0",
     "langgraph>=1.0.8",
+    "passlib[bcrypt]>=1.7.4",
     "pymupdf>=1.27.1",
     "pypdf>=6.7.1",
     "python-dotenv>=1.2.1",
+    "python-jose>=3.5.0",
     "sentence-transformers>=5.2.3",
     "sqlalchemy>=2.0.49",
 ]

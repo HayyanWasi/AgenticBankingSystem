@@ -67,7 +67,10 @@ def get_user_dashboard(user_id: int, db: Session = Depends(get_db)):
 
     return {
         "full_name": user.full_name,
+        "email": user.email,
+        "account_number": account.account_number if account else None,
         "balance": balance,
         "kyc_status": kyc_status,
-        "recent_transactions": formatted_tx
+        "recent_transactions": formatted_tx,
+        "is_admin": user.is_admin,
     }

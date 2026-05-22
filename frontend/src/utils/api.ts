@@ -7,6 +7,46 @@ import { getThreadId } from "./threadId";
 
 const API_BASE = "/api/v1";
 
+function resolveEndpoint(endpoint: string) {
+  // If the caller passed a full /api path, use it as-is. Otherwise prefix with API_BASE.
+  if (endpoint.startsWith("/api")) return endpoint;
+  return `${API_BASE}${endpoint}`;
+}
+
+export async function post<T = any>(endpoint: string, body: any): Promise<T> {
+  const threadId = getThreadId();
+  const url = resolveEndpoint(endpoint);
+  const token = localStorage.getItem('access_token');
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ ...body, thread_id: threadId }),
+  });
+  if (!res.ok) throw new Error(`POST ${url} failed: ${res.status}`);
+  return res.json();
+}
+
+export async function get<T = any>(endpoint: string): Promise<T> {
+  const url = resolveEndpoint(endpoint);
+  const token = localStorage.getItem('access_token');
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(url, {
+    headers,
+  });
+  if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
+  return res.json();
+}
 interface ChatResponse {
   reply: string;
   thread_id: string;
@@ -23,9 +63,13 @@ interface ManagerChatResponse {
  */
 export async function chatWithManager(message: string): Promise<ManagerChatResponse> {
   const threadId = getThreadId();
+  const token = localStorage.getItem('access_token');
   const res = await fetch(`${API_BASE}/manager/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ message, thread_id: threadId }),
   });
   if (!res.ok) throw new Error(`Manager chat failed: ${res.status}`);
@@ -74,9 +118,12 @@ export interface Transaction {
 
 export interface DashboardData {
   full_name: string;
+  email?: string;
+  account_number?: string;
   balance: number;
   kyc_status: string;
   recent_transactions: Transaction[];
+  is_admin: boolean;
 }
 
 /**
@@ -88,3 +135,14 @@ export async function getDashboard(userId: number = 1): Promise<DashboardData> {
   if (!res.ok) throw new Error(`Failed to fetch dashboard: ${res.status}`);
   return res.json();
 }
+
+export const api = {
+  get,
+  post,
+  chatWithManager,
+  chatWithPrivacy,
+  reviewTransaction,
+  getDashboard,
+};
+
+export default api;

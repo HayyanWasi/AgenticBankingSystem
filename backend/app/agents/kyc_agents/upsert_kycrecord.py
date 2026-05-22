@@ -23,6 +23,7 @@ def upsert_kyc_record(state: KYCState) -> dict:
         # Handle database conflicts (e.g., Duplicate ID)
         return {
             "kyc_status": "failed",
+            "verification_status": "rejected",
             "reject_reason": result.get("reason")
         }
 
@@ -32,6 +33,7 @@ def route_after_upsert(state: KYCState) -> str:
     if status == "success":
         return "kyc_agent"
     elif status == "failed":
-        return "extract_kyc_details"
+        # Route directly to customer notification to end the graph cleanly
+        return "notify_customer"
 
     return "human_review"

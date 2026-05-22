@@ -5,6 +5,17 @@ from app.database.db_tool import update_kyc_decision
 
 
 def human_review(state: KYCState) -> dict:
+    from app.database.engine import engine
+    from sqlalchemy.orm import Session
+    from app.models import KYC, User
+    
+    # Force DB state to pending so it appears in the Admin Portal queue
+    with Session(engine) as db:
+        user = db.query(User).filter(User.id_card_num == state.get("id_card_num")).first()
+        if user and user.kyc_record:
+            user.kyc_record.verification_status = "pending"
+            db.commit()
+
     # The pause
     decision_payload = interrupt({
         "question": f"Review required for {state.get('full_name')}",

@@ -1,23 +1,25 @@
 from app.agents.privacy_policy_agent.agent import vector_db
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import AIMessage
 from app.schemas.bank_manager import SupervisorState
-
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash") # Use 2.0 per previous fixes
+from app.config.privacy_policy_agent_config import privacy_policy_llm as llm
 
 def privacy_policy_node(state: SupervisorState):
     # 1. Get the last user message
     query = state["messages"][-1].content
-    
-    # 2. Manual RAG retrieval (bypassing the need for a complex internal agent loop)
+
+    # 2. If vector DB is unavailable (PDF missing), respond gracefully
+    if vector_db is None:
+        return {"messages": [AIMessage(content="The privacy policy document is currently unavailable. Please contact support.")]}
+
+    # 3. Manual RAG retrieval
     retrieved_docs = vector_db.similarity_search(query, k=3)
     context = "\n\n".join([doc.page_content for doc in retrieved_docs])
     
-    # 3. Generate response
+    # 4. Generate response
     system_prompt = f"Use this context to answer: {context}. Only use the provided data."
     response = llm.invoke([
         ("system", system_prompt),
         ("user", query)
     ])
     
-    return {"messages": [AIMessage(content=response.content)]}
+    return {"messages": [AIMessage(content=response.content)]}

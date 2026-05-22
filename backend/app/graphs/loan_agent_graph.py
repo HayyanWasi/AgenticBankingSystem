@@ -55,7 +55,7 @@ _conversation_llm = ChatOpenAI(
     }
 )
 
-_REQUIRED = ["full_name", "id_card_num", "loan_amount", "loan_term_months", "monthly_income", "loan_purpose"]
+_REQUIRED = ["loan_amount", "loan_term_months", "monthly_income", "loan_purpose"]
 
 
 # ── Extraction Node ──────────────────────────────────────────────────────────

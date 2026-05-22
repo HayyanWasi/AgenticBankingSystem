@@ -35,29 +35,37 @@ PERSIST_DIR = os.path.join(BASE_DIR, "chroma")
 model_name = "sentence-transformers/all-MiniLM-L6-v2"
 embeddings = HuggingFaceEmbeddings(model_name=model_name)
 
-if os.path.exists(PERSIST_DIR):
-    print(f"Loading existing Vector DB from {PERSIST_DIR}...")
-    vector_db = Chroma(
-        persist_directory=str(PERSIST_DIR), 
-        embedding_function=embeddings
-    )
-else:
-    print("No existing DB found. Ingesting PDF...")
-    pdf_path = os.path.join(BASE_DIR, "data", "privacy_policy.pdf")
-    loader = PyPDFLoader(pdf_path)
-    docs = loader.load()
-    
-    splitter = RecursiveCharacterTextSplitter(chunk_size = 1000, chunk_overlap=200)
-    chunks = splitter.split_documents(docs)
-    
-    # Create vector store from chunks using ChromaDB
-    vector_db = Chroma.from_documents(
-        documents=chunks, 
-        embedding=embeddings,
-        persist_directory=PERSIST_DIR
-    )
+vector_db = None
+retriever = None
 
-retriever = vector_db.as_retriever(search_type='similarity', search_kwargs={'k':4})
+try:
+    if os.path.exists(PERSIST_DIR):
+        print(f"Loading existing Vector DB from {PERSIST_DIR}...")
+        vector_db = Chroma(
+            persist_directory=str(PERSIST_DIR), 
+            embedding_function=embeddings
+        )
+    else:
+        pdf_path = os.path.join(BASE_DIR, "data", "privacy_policy_for_banking_simulation_app.pdf")
+        if not os.path.exists(pdf_path):
+            print(f"WARNING: privacy_policy_for_banking_simulation_app.pdf not found at {pdf_path}. Privacy agent will be unavailable.")
+        else:
+            print("No existing DB found. Ingesting PDF...")
+            loader = PyPDFLoader(pdf_path)
+            docs = loader.load()
+            splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+            chunks = splitter.split_documents(docs)
+            vector_db = Chroma.from_documents(
+                documents=chunks, 
+                embedding=embeddings,
+                persist_directory=PERSIST_DIR
+            )
+
+    if vector_db is not None:
+        retriever = vector_db.as_retriever(search_type='similarity', search_kwargs={'k': 4})
+except Exception as e:
+    print(f"WARNING: Could not initialize vector DB: {e}. Privacy agent will be unavailable.")
+
 
 @tool
 def rag_tool(query):
@@ -66,6 +74,12 @@ def rag_tool(query):
     Use this tool when the user asks factual / conceptual questions
     that might be answered from the stored documents.
     """
+    if retriever is None:
+        return {
+            'query': query,
+            'context': ["Privacy policy document is not available at the moment."],
+            'metadata': []
+        }
     result = retriever.invoke(query)
 
     context = [doc.page_content for doc in result]

@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getDashboard } from '../utils/api';
+import type { DashboardData } from '../utils/api';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -8,6 +10,23 @@ export default function SettingsPage() {
   const [aiMonitoring, setAiMonitoring] = useState(true);
   const [emailNotif, setEmailNotif] = useState(true);
   const [pushNotif, setPushNotif] = useState(false);
+  const [userData, setUserData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const userId = Number(localStorage.getItem('user_id')) || 1;
+        const data = await getDashboard(userId);
+        setUserData(data);
+      } catch (err) {
+        console.error("Failed to fetch settings data", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadSettings();
+  }, []);
 
   const Toggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) => (
     <label className="relative inline-flex items-center cursor-pointer">
@@ -35,8 +54,15 @@ export default function SettingsPage() {
             />
           </div>
           <div>
-            <p className="font-[var(--font-body)] text-[16px] text-on-surface font-medium">Alex Rivers</p>
-            <p className="font-[var(--font-mono)] text-[12px] text-on-surface-variant tracking-[0.05em]">alex.rivers@example.com</p>
+            <p className="font-[var(--font-body)] text-[16px] text-on-surface font-medium">
+              {loading ? "Loading..." : userData?.full_name || "Unknown User"}
+            </p>
+            <p className="font-[var(--font-mono)] text-[12px] text-on-surface-variant tracking-[0.05em]">
+              {loading ? "..." : userData?.email || "No email provided"}
+            </p>
+            <p className="font-[var(--font-mono)] text-[12px] text-secondary tracking-[0.05em] mt-1">
+              Account #: {loading ? "..." : userData?.account_number || "Not Assigned"}
+            </p>
           </div>
         </div>
         <button className="bg-surface-container-low text-on-surface font-[var(--font-mono)] text-[12px] tracking-[0.05em] px-[16px] py-[8px] rounded-[8px] cursor-pointer border-none hover:bg-surface-container-high transition-colors">Edit Profile</button>

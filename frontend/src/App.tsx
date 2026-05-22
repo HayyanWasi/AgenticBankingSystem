@@ -9,6 +9,7 @@ import KycPage from './pages/KycPage';
 import PrivacyPage from './pages/PrivacyPage';
 import NotificationsPage from './pages/NotificationsPage';
 import SettingsPage from './pages/SettingsPage';
+import AdminPortal from './pages/AdminPortal';
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/admin" element={<AdminPortal />} />
         </Route>
 
         {/* Fallback */}

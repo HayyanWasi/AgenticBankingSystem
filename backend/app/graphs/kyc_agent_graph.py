@@ -11,7 +11,6 @@ from app.config.kyc_config import tool_node
 from pydantic import BaseModel, Field
 from typing import Optional
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
 
 from langgraph.prebuilt import ToolNode

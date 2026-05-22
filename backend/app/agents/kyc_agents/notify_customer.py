@@ -25,6 +25,7 @@ from app.schemas.kyc_agent_schema import KYCState
 
 
 def notify_customer(state: KYCState) -> dict:
+    print("--- [DEBUG] ENTERING NOTIFY CUSTOMER ---")
     status = state.get("verification_status") # This will now be 'approved' or 'rejected'
     
     if status == "approved":
@@ -34,4 +35,5 @@ def notify_customer(state: KYCState) -> dict:
     else:
         msg = "Your application is under review." # The fallback you saw
         
+    print(f"--- [DEBUG] EXITING NOTIFY CUSTOMER WITH MSG: {msg} ---")
     return {"notification_message": msg}

@@ -70,6 +70,7 @@ class KYCSubmission(BaseModel):
     full_name: str
     id_card_num: str
     nationality: str
+    phone_number: str
 
 @router.post("/submit")
 async def submit_kyc(data: KYCSubmission):
@@ -79,10 +80,13 @@ async def submit_kyc(data: KYCSubmission):
         "full_name": data.full_name,
         "id_card_num": data.id_card_num,
         "nationality": data.nationality,
+        "phone_number": data.phone_number,
         "messages": [] # Initialize messages if your graph expects them
     }
     
+    print(f"--- [DEBUG] INVOKING KYC GRAPH FOR {data.id_card_num} ---")
     final_state = kyc_app.invoke(initial_state, config)
+    print("--- [DEBUG] KYC GRAPH INVOKE FINISHED ---")
     
     snapshot = kyc_app.get_state(config)
     
@@ -96,7 +100,29 @@ async def submit_kyc(data: KYCSubmission):
 
     return {
         "status": final_state.get("verification_status"),
-        "message": "KYC Processed Successfully",
+        "message": final_state.get("notification_message") or final_state.get("reject_reason") or "KYC Processed Successfully",
         "score": final_state.get("kyc_score")
     }
 
+@router.get("/pending-kyc")
+async def get_pending_kyc():
+    """
+    Queries the SQL database for any users whose KYC status is currently 'pending_review'
+    """
+    with Session(engine) as db:
+        # Query your SQL tables for pending records
+        pending_records = db.query(User).join(User.kyc_record).filter(
+            User.kyc_record.verification_status == "pending_review"
+        ).all()
+        
+        results = []
+        for user in pending_records:
+            results.append({
+                "user_id": user.user_id,
+                "full_name": user.full_name,
+                "nationality": user.kyc_record.nationality if user.kyc_record else "Unknown",
+                "id_card_num": user.kyc_record.id_card_num if user.kyc_record else "N/A",
+                "phone_number": user.kyc_record.phone_number if user.kyc_record else "N/A",
+                "email": user.email if hasattr(user, 'email') else "N/A"
+            })
+        return results

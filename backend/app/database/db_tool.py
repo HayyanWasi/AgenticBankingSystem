@@ -124,12 +124,19 @@ def upsert_user_kyc_details(full_name: str, id_card_num: str, phone_number: str,
                 full_name=full_name, 
                 id_card_num=id_card_num, 
                 phone_number=phone_number, 
-                nationality=nationality
+                nationality=nationality,
+                email=f"{full_name.lower().replace(' ', '')}@example.com",
+                password_hash="fakehash"
             )
             db.add(user)
             db.commit()
             db.refresh(user)
         else:
+            # Check for duplicate ID cards to prevent SQLite Integrity Errors when updating
+            existing_id = db.query(User).filter(User.id_card_num == id_card_num, User.user_id != user.user_id).first()
+            if existing_id:
+                return {"status": "failed", "reason": "ID Card Number is already registered to another user."}
+                
             # Update existing user data
             user.id_card_num = id_card_num
             user.phone_number = phone_number
@@ -183,7 +190,7 @@ def get_user_kyc_status(id_card_num: str) -> dict:
             return {"status": "not_found", "message": "No user found with this ID."}
 
         kyc = user.kyc_record
-        HIGH_RISK_COUNTRIES = ["North Korea", "Ukraine", "Afghanistan"]
+        HIGH_RISK_COUNTRIES = ["North Korea", "Ukraine", "Afghanistan", "Pakistan"]
         is_risk = user.nationality in HIGH_RISK_COUNTRIES
 
         return {

@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, Boolean
 from sqlalchemy.orm import declarative_base, relationship
 import datetime
+import bcrypt
 
 Base = declarative_base()
 
@@ -13,11 +14,17 @@ class User(Base):
     phone_number = Column(String)
     nationality = Column(String)
     balance = Column(Float, default=0.0)
+    email = Column(String, unique=True, nullable=False)
+    password_hash = Column(String(128))
+    is_admin = Column(Boolean, default=False)
 
     # Relationships
     accounts = relationship("Account", back_populates="owner")
     loans = relationship("Loan", back_populates="borrower")
     kyc_record = relationship("KYC", back_populates="user", uselist=False)
+
+password = "my_secure_password".encode('utf-8')
+hashed = bcrypt.hashpw(password, bcrypt.gensalt())
 
 class Account(Base):
     __tablename__ = 'accounts'

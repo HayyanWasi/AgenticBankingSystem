@@ -29,6 +29,7 @@ class TransferExtraction(BaseModel):
     sender_account_number: str | None = Field(default=None, description="The account sending money. Accept ANY string of characters or numbers.")
     receiver_account_number: str | None = Field(default=None, description="The account receiving money. Accept ANY string of characters or numbers.")
     money: float | None = Field(default=None, description="The numerical amount to transfer")
+    is_cancelled: bool = Field(default=False, description="Set to True if the user explicitly wants to cancel, exit, stop the transfer, or asks a completely unrelated question.")
 
 _extraction_llm = ChatOpenAI(
     model="google/gemini-2.0-flash-001",
@@ -55,23 +56,37 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.types import interrupt
 
 # ONLY require the fields the user must provide in the chat
-_REQUIRED = ["sender_account_number", "receiver_account_number", "money"]
+# Sender account is injected from the authenticated user's context — only ask for these two
+_REQUIRED = ["receiver_account_number", "money"]
 
 # ── Extraction Node ──────────────────────────────────────────────────────────
 
 def extract_transfer_details(state: TransferState) -> dict:
     
+    # Short-circuit: if all required fields are already in state (from API call), skip LLM extraction
+    if all(state.get(f) is not None for f in _REQUIRED):
+        updates = {}
+        if not state.get("sent_time"):
+            updates["sent_time"] = datetime.now().strftime("%H:%M")
+        return updates
+
     current_data = {f: state.get(f) for f in _REQUIRED if state.get(f)}
     
     # 2. Feed the ENTIRE message history to the extractor to maintain context
     extraction_messages = [
-        SystemMessage(content=f"Extract transfer details from this conversation. Current verified data: {current_data}. Return null for missing fields.")
+        SystemMessage(content=f"Extract transfer details from this conversation. Current verified data: {current_data}. Return null for missing fields. If the user asks to cancel, exit, or asks an unrelated question (like privacy policies), set is_cancelled to true.")
     ] + state.get("messages", [])
     
     extracted: TransferExtraction = _extraction_llm.invoke(extraction_messages)
 
     updates: dict = {}
+    if extracted.is_cancelled:
+        updates["transaction_status"] = "cancelled"
+        updates["messages"] = [AIMessage(content="I have cancelled the transfer process.")]
+        return updates
+
     for field, value in extracted.model_dump().items():
+        if field == "is_cancelled": continue
         if value is not None and state.get(field) is None:
             updates[field] = value
 
@@ -112,7 +127,10 @@ def extract_transfer_details(state: TransferState) -> dict:
 
     return updates
 
+
 def route_after_extraction(state: TransferState) -> str:
+    if state.get("transaction_status") == "cancelled":
+        return END
     missing = [f for f in _REQUIRED if state.get(f) is None]
     return "balance_check" if not missing else "extract_transfer_details"
 

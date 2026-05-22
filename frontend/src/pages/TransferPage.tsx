@@ -1,10 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function TransferPage() {
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [resultMessage, setResultMessage] = useState('');
+  const [resultStatus, setResultStatus] = useState<'success' | 'failed' | ''>('');
+  const [senderAccount, setSenderAccount] = useState('');
+  const [currentBalance, setCurrentBalance] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchAccount = async () => {
+      const userId = localStorage.getItem('user_id');
+      if (userId) {
+        try {
+          const res = await fetch(`/api/v1/user/dashboard/${userId}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.account_number) {
+              setSenderAccount(data.account_number);
+              setCurrentBalance(data.balance);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to fetch account info", e);
+        }
+      }
+    };
+    fetchAccount();
+  }, []);
 
   const recentContacts = [
     { name: 'Sarah Jenkins', account: '****4521', avatar: 'person' },
@@ -12,10 +38,56 @@ export default function TransferPage() {
     { name: 'Lisa Wang', account: '****2210', avatar: 'person' },
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
+    if (!recipient || !amount) return;
+
+    setLoading(true);
+    setResultMessage('');
+    setResultStatus('');
+
+    if (!senderAccount) {
+      setResultStatus('failed');
+      setResultMessage('Could not determine your account number. Please log out and log in again.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/v1/transfer/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender_acc: senderAccount,
+          receiver_acc: recipient,
+          amount: parseFloat(amount),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.status === 'failed') {
+        setResultStatus('failed');
+        setResultMessage(data.message || 'Transfer failed. Please try again.');
+      } else {
+        setResultStatus('success');
+        setResultMessage(data.message || `Successfully sent $${amount} to ${recipient}.`);
+        setSubmitted(true);
+        setTimeout(() => {
+          setSubmitted(false);
+          setRecipient('');
+          setAmount('');
+          setNote('');
+          setResultStatus('');
+          setResultMessage('');
+        }, 4000);
+      }
+    } catch {
+      setResultStatus('failed');
+      setResultMessage('Network error. Please check your connection.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -23,7 +95,12 @@ export default function TransferPage() {
       {/* Header */}
       <div className="mb-[32px]">
         <h1 className="font-[var(--font-headline)] text-[24px] md:text-[32px] font-semibold text-on-surface tracking-tight">Secure Transfer</h1>
-        <p className="font-[var(--font-body)] text-[14px] text-on-surface-variant mt-[4px]">Send money with AI-powered fraud protection</p>
+        <p className="font-[var(--font-body)] text-[14px] text-on-surface-variant mt-[4px]">
+          Send money with AI-powered fraud protection
+          {currentBalance !== null && (
+             <span className="ml-[8px] font-bold text-secondary">| Available Balance: ${currentBalance.toFixed(2)}</span>
+          )}
+        </p>
       </div>
 
       {/* AI Status */}
@@ -94,13 +171,34 @@ export default function TransferPage() {
                   />
                 </div>
 
+                {resultMessage && (
+                  <div className={`rounded-[8px] p-[12px] text-[13px] font-[var(--font-body)] ${
+                    resultStatus === 'success' 
+                      ? 'bg-secondary-container/40 text-secondary border border-secondary/20' 
+                      : 'bg-error-container/40 text-error border border-error/20'
+                  }`}>
+                    {resultMessage}
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  className="w-full bg-secondary text-on-secondary font-[var(--font-mono)] text-[12px] font-medium tracking-[0.05em] py-[14px] rounded-[8px] mt-[8px] hover:bg-on-surface-variant transition-colors flex items-center justify-center gap-[8px] cursor-pointer border-none"
+                  disabled={loading}
+                  className="w-full bg-secondary text-on-secondary font-[var(--font-mono)] text-[12px] font-medium tracking-[0.05em] py-[14px] rounded-[8px] mt-[8px] hover:bg-on-surface-variant transition-colors flex items-center justify-center gap-[8px] cursor-pointer border-none disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>send</span>
-                  Send Transfer
+                  {loading ? (
+                    <>
+                      <span className="material-symbols-outlined animate-spin" style={{ fontSize: '18px' }}>progress_activity</span>
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>send</span>
+                      Send Transfer
+                    </>
+                  )}
                 </button>
+
               </form>
             )}
           </div>

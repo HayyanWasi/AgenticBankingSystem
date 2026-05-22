@@ -23,5 +23,6 @@ def balance_check(state: TransferState):
     
     return {
         "balance_check_status": "insufficient_balance",
-        "transaction_status": "failed"
+        "transaction_status": "failed",
+        "reason": f"Insufficient funds. Your balance is ${db_data['balance']:.2f}."
     }

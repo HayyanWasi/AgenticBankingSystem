@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.database.engine import engine
 from app.models import User, Account, Base
+from app.utils.auth import get_password_hash
 
 def seed_database():
     # Rebuild tables just in case they were deleted
@@ -15,7 +16,14 @@ def seed_database():
         print("Seeding database with test accounts...")
         
         # Create Alice (Sender)
-        alice = User(full_name="Alice Smith", id_card_num="ID-111", phone_number="555-0100", nationality="US")
+        alice = User(
+            full_name="Alice Smith", 
+            id_card_num="ID-111", 
+            phone_number="555-0100", 
+            nationality="US",
+            email="alice@example.com",
+            password_hash=get_password_hash("password123")
+        )
         session.add(alice)
         session.commit() # Commit to generate her user_id
         
@@ -23,7 +31,14 @@ def seed_database():
         session.add(alice_account)
         
         # Create Bob (Receiver)
-        bob = User(full_name="Bob Jones", id_card_num="ID-222", phone_number="555-0200", nationality="Afghanistan")
+        bob = User(
+            full_name="Bob Jones", 
+            id_card_num="ID-222", 
+            phone_number="555-0200", 
+            nationality="Afghanistan",
+            email="bob@example.com",
+            password_hash=get_password_hash("password123")
+        )
         session.add(bob)
         session.commit() # Commit to generate his user_id
         

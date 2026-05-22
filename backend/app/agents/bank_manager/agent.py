@@ -16,7 +16,7 @@ def supervisor_route(state: SupervisorState) -> dict:
     last_message = state["messages"][-1].content
     
     prompt = f"""
-    Act as a bank dispatcher. Route this user request: "{last_message}"
+    Act as a bank Manager. Route this user request: "{last_message} to the correct department based on the following criteria:"
     
     - If they ask about policies, sharing, or privacy: privacy_policy_agent
     - If they ask for a loan: loan_agent

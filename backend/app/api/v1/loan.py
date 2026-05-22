@@ -1,32 +1,35 @@
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body
 from pydantic import BaseModel
 from langgraph.types import Command
-from app.graphs.loan_agent_graph import loan_app 
+from app.graphs.loan_agent_graph import loan_app
+from sqlalchemy.orm import Session
+from app.database.engine import engine
+from app.models import Loan
+from app.utils.deps import UserContext, get_current_user
 
 router = APIRouter()
 
 class ApplyLoan(BaseModel):
-    full_name: str
-    id_card_num: str
-    loan_amount: float      # Changed from str to float
-    loan_term_months: int   # Changed from str to int
-    monthly_income: float   # Changed from str to float
+    # full_name and id_card_num are now injected from the authenticated user — not required here
+    loan_amount: float
+    loan_term_months: int
+    monthly_income: float
     loan_purpose: str
     loan_reason: str
 
 @router.post("/apply")
-async def apply_loan(data: ApplyLoan):
-    config = {"configurable": {"thread_id": data.id_card_num}}
+async def apply_loan(data: ApplyLoan, current_user: UserContext = Depends(get_current_user)):
+    config = {"configurable": {"thread_id": current_user.id_card_num}}
 
     initial_state = {
-        "full_name": data.full_name,
-        "id_card_num": data.id_card_num,
+        "full_name": current_user.full_name,
+        "id_card_num": current_user.id_card_num,
         "loan_amount": data.loan_amount,
         "loan_term_months": data.loan_term_months,
         "monthly_income": data.monthly_income,
         "loan_purpose": data.loan_purpose,
         "loan_reason": data.loan_reason,
-        "messages": [] # Crucial for the graph to have a message history key
+        "messages": []  # Crucial for the graph to have a message history key
     }
     
     final_state = loan_app.invoke(initial_state, config)
@@ -56,3 +59,28 @@ async def review_loan(id_card_num: str = Body(..., embed=True), decision: str = 
     final_state = loan_app.invoke(Command(resume=decision), config)
     return {"status": final_state.get("loan_status"), "message": final_state.get("notification_message")}
 
+@router.get("/user/{user_id}")
+async def get_user_loans(user_id: int):
+    """
+    Directly queries the database for active loans belonging to this user profile.
+    """
+    with Session(engine) as db:
+        records = db.query(Loan).filter(Loan.user_id == user_id).all()
+        
+        results = []
+        for l in records:
+            # Map database keys to format names expected by your React component
+            # Calculate payoff progress percentages dynamically
+            progress_pct = 0
+            if l.amount > 0:
+                progress_pct = int(((l.amount - l.remaining_balance) / l.amount) * 100)
+                
+            results.append({
+                "type": getattr(l, "loan_type", "Personal Loan"),
+                "id": f"LN-2026-{l.id}",
+                "amount": f"${l.amount:,.2f}",
+                "remaining": f"${l.remaining_balance:,.2f}",
+                "status": l.status, # e.g. "Active", "pending_human_review", "Approved"
+                "progress": max(0, min(progress_pct, 100)) # Clamped between 0-100
+            })
+        return results
