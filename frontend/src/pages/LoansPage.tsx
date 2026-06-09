@@ -60,7 +60,7 @@ export default function LoansPage() {
     const parsedIncome = parseFloat(incomeInput.replace(/[^0-9.]/g, '')) || 0;
 
     try {
-      const res = await api.post('/api/v1/loan/apply', {
+      await api.post('/api/v1/loan/apply', {
         full_name: "Alice Smith", // Shared context fallback
         id_card_num: "123456",    // Acts as Thread ID for LangGraph memory routing
         loan_amount: parsedAmount,

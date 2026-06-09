@@ -80,10 +80,10 @@ export default function DashboardPage() {
       if (res && typeof res === 'object') {
         if ('reply' in res) {
           rawReply = (res as any).reply;
-        } else if ('data' in res && res.data && 'reply' in res.data) {
-          rawReply = res.data.reply;
-        } else if ('data' in res && typeof res.data === 'string') {
-          rawReply = res.data;
+        } else if ('data' in res && (res as any).data && 'reply' in (res as any).data) {
+          rawReply = (res as any).data.reply;
+        } else if ('data' in res && typeof (res as any).data === 'string') {
+          rawReply = (res as any).data;
         } else {
           rawReply = JSON.stringify(res);
         }

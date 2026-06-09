@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { getDashboard } from '../utils/api';
 import type { DashboardData } from '../utils/api';
 
 export default function SettingsPage() {
-  const navigate = useNavigate();
   const [twoFa, setTwoFa] = useState(true);
   const [biometric, setBiometric] = useState(true);
   const [aiMonitoring, setAiMonitoring] = useState(true);
