@@ -15,8 +15,7 @@ from langgraph.graph.message import add_messages
 from langchain_core.messages import HumanMessage, BaseMessage
 from langgraph.prebuilt import ToolNode, tools_condition
 from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
-
+from langchain_community.embeddings import FastEmbedEmbeddings
 import os 
 load_dotenv()
 
@@ -32,8 +31,8 @@ llm = ChatOpenAI(
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 PERSIST_DIR = os.path.join(BASE_DIR, "chroma")
-model_name = "sentence-transformers/all-MiniLM-L6-v2"
-embeddings = HuggingFaceEmbeddings(model_name=model_name)
+model_name = "BAAI/bge-small-en-v1.5"
+embeddings = FastEmbedEmbeddings(model_name=model_name)
 
 vector_db = None
 retriever = None
