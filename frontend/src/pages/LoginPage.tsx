@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { API_BASE_URL } from '../utils/api';
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
@@ -23,7 +25,7 @@ export default function LoginPage() {
 
     try {
       if (isLogin) {
-        const res = await fetch('/api/v1/auth/login', {
+        const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password }),
@@ -40,7 +42,7 @@ export default function LoginPage() {
 
         // Fetch dashboard to get account_number and persist it
         try {
-          const dashRes = await fetch(`/api/v1/user/dashboard/${response.user_id}`);
+          const dashRes = await fetch(`${API_BASE_URL}/api/v1/user/dashboard/${response.user_id}`);
           if (dashRes.ok) {
             const dashData = await dashRes.json();
             localStorage.setItem('account_number', dashData.account_number ?? '');
@@ -49,7 +51,7 @@ export default function LoginPage() {
 
         navigate('/dashboard');
       } else {
-        const res = await fetch('/api/v1/auth/register', {
+        const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -5,11 +5,14 @@
 
 import { getThreadId } from "./threadId";
 
-const API_BASE = "/api/v1";
+// When deployed, this uses the real backend URL (e.g. "https://agentic-banking.onrender.com")
+// Locally, it's empty so it falls back to the Vite proxy in vite.config.ts.
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+export const API_BASE = `${API_BASE_URL}/api/v1`;
 
 function resolveEndpoint(endpoint: string) {
   // If the caller passed a full /api path, use it as-is. Otherwise prefix with API_BASE.
-  if (endpoint.startsWith("/api")) return endpoint;
+  if (endpoint.startsWith("/api")) return `${API_BASE_URL}${endpoint}`;
   return `${API_BASE}${endpoint}`;
 }
 

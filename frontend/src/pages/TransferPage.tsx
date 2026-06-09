@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../utils/api';
 
 export default function TransferPage() {
   const [recipient, setRecipient] = useState('');
@@ -16,7 +17,7 @@ export default function TransferPage() {
       const userId = localStorage.getItem('user_id');
       if (userId) {
         try {
-          const res = await fetch(`/api/v1/user/dashboard/${userId}`);
+          const res = await fetch(`${API_BASE_URL}/api/v1/user/dashboard/${userId}`);
           if (res.ok) {
             const data = await res.json();
             if (data.account_number) {
@@ -54,7 +55,7 @@ export default function TransferPage() {
     }
 
     try {
-      const res = await fetch('/api/v1/transfer/initiate', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/transfer/initiate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
