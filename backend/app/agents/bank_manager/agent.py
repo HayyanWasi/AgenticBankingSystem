@@ -11,26 +11,31 @@ from app.graphs.transfer_graph import transfer_workflow as transfer_agent_graph
 from app.graphs.privacy_agent_graph import privacy_policy_node
 from app.config.supervisor_config import route_decision_llm
 
-
 def supervisor_route(state: SupervisorState) -> dict:
     last_message = state["messages"][-1].content
     
     prompt = f"""
-    Act as a bank Manager. Route this user request: "{last_message} to the correct department based on the following criteria:"
+    You are the central routing manager for an Agentic Banking system. 
     
-    - If they ask about policies, sharing, or privacy: privacy_policy_agent
-    - If they ask for a loan: loan_agent
-    - If they want to send money: payment_transaction_process_agent
-    - If they mention ID/Verification: kyc_agent
-    - If it's a greeting or closing: END
+    First, write out your reasoning. Ask yourself: "Is this user trying to DO something right now, or are they asking to LEARN about something?"
+    
+    After your reasoning, output the exact destination string based on these rules:
+    - "loan_agent": User wants to INITIATE a loan.
+    - "payment_transaction_process_agent": User wants to EXECUTE a money transfer.
+    - "privacy_policy_agent": User asks about rules, consent, terms, or definitions.
+    - "kyc_agent": User wants to verify their ID.
+    - "END": Greetings or general chat.
+    
+    User Input: "{last_message}"
     """
     
     response = route_decision_llm.invoke(prompt)
     
-    destination = response.destination 
-
-    print(f"--- [ROUTING] Decision: {destination} ---")
-    return {"next_route": destination}  
+    # Expose the LLM's logic to your terminal so you can audit its thinking
+    print(f"--- [ROUTING REASONING]: {response.reasoning} ---")
+    print(f"--- [ROUTING DECISION]: {response.destination} ---")
+    
+    return {"next_route": response.destination}
     
 graph = StateGraph(SupervisorState)
 

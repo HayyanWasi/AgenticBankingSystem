@@ -15,7 +15,7 @@ load_dotenv(override=True)
 # )
 
 kyc_generator_llm = ChatOpenAI(
-    model="google/gemini-2.0-flash-001", 
+    model="deepseek/deepseek-v4-flash", 
     temperature=0.7,
     api_key=os.getenv("OPENROUTER_API_KEY"),
     base_url="https://openrouter.ai/api/v1",
@@ -25,7 +25,7 @@ kyc_generator_llm = ChatOpenAI(
 )
 
 kyc_conversation_llm = ChatOpenAI(
-    model="google/gemini-2.0-flash-001",
+    model="deepseek/deepseek-v4-flash",
     temperature=0.4,
     api_key=os.getenv("OPENROUTER_API_KEY"),
     base_url="https://openrouter.ai/api/v1",
@@ -35,7 +35,7 @@ kyc_conversation_llm = ChatOpenAI(
 )
 
 kyc_extraction_llm_base = ChatOpenAI(
-    model="google/gemini-2.0-flash-001",
+    model="deepseek/deepseek-v4-flash",
     temperature=0,
     api_key=os.getenv("OPENROUTER_API_KEY"),
     base_url="https://openrouter.ai/api/v1",
