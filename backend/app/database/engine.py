@@ -5,6 +5,8 @@ from app.models import Base
 
 # By default, use SQLite locally. In production (Render), we will set DATABASE_URL to a PostgreSQL connection string.
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///bank_data.db")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # Only use check_same_thread for SQLite
 connect_args = {"timeout": 30}
