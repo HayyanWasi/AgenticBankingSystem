@@ -32,38 +32,51 @@ llm = ChatOpenAI(
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 PERSIST_DIR = os.path.join(BASE_DIR, "chroma")
 model_name = "BAAI/bge-small-en-v1.5"
-embeddings = FastEmbedEmbeddings(model_name=model_name)
 
-vector_db = None
-retriever = None
+# Lazy loaded — not initialized at import time
+_embeddings = None
+_vector_db = None
+_retriever = None
 
-try:
-    if os.path.exists(PERSIST_DIR):
-        print(f"Loading existing Vector DB from {PERSIST_DIR}...")
-        vector_db = Chroma(
-            persist_directory=str(PERSIST_DIR), 
-            embedding_function=embeddings
-        )
-    else:
-        pdf_path = os.path.join(BASE_DIR, "data", "privacy_policy_for_banking_simulation_app.pdf")
-        if not os.path.exists(pdf_path):
-            print(f"WARNING: privacy_policy_for_banking_simulation_app.pdf not found at {pdf_path}. Privacy agent will be unavailable.")
-        else:
-            print("No existing DB found. Ingesting PDF...")
-            loader = PyPDFLoader(pdf_path)
-            docs = loader.load()
-            splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-            chunks = splitter.split_documents(docs)
-            vector_db = Chroma.from_documents(
-                documents=chunks, 
-                embedding=embeddings,
-                persist_directory=PERSIST_DIR
+def get_embeddings():
+    global _embeddings
+    if _embeddings is None:
+        _embeddings = FastEmbedEmbeddings(model_name=model_name)
+    return _embeddings
+
+def get_retriever():
+    global _vector_db, _retriever
+    if _retriever is not None:
+        return _retriever
+    try:
+        embeddings = get_embeddings()
+        if os.path.exists(PERSIST_DIR):
+            print(f"Loading existing Vector DB from {PERSIST_DIR}...")
+            _vector_db = Chroma(
+                persist_directory=str(PERSIST_DIR),
+                embedding_function=embeddings
             )
-
-    if vector_db is not None:
-        retriever = vector_db.as_retriever(search_type='similarity', search_kwargs={'k': 4})
-except Exception as e:
-    print(f"WARNING: Could not initialize vector DB: {e}. Privacy agent will be unavailable.")
+        else:
+            pdf_path = os.path.join(BASE_DIR, "data", "privacy_policy_for_banking_simulation_app.pdf")
+            if not os.path.exists(pdf_path):
+                print(f"WARNING: PDF not found at {pdf_path}. Privacy agent will be unavailable.")
+                return None
+            else:
+                print("No existing DB found. Ingesting PDF...")
+                loader = PyPDFLoader(pdf_path)
+                docs = loader.load()
+                splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+                chunks = splitter.split_documents(docs)
+                _vector_db = Chroma.from_documents(
+                    documents=chunks,
+                    embedding=embeddings,
+                    persist_directory=PERSIST_DIR
+                )
+        if _vector_db is not None:
+            _retriever = _vector_db.as_retriever(search_type='similarity', search_kwargs={'k': 4})
+    except Exception as e:
+        print(f"WARNING: Could not initialize vector DB: {e}. Privacy agent will be unavailable.")
+    return _retriever
 
 
 @tool
@@ -73,6 +86,7 @@ def rag_tool(query):
     Use this tool when the user asks factual / conceptual questions
     that might be answered from the stored documents.
     """
+    retriever = get_retriever()
     if retriever is None:
         return {
             'query': query,
@@ -80,10 +94,8 @@ def rag_tool(query):
             'metadata': []
         }
     result = retriever.invoke(query)
-
     context = [doc.page_content for doc in result]
     metadata = [doc.metadata for doc in result]
-
     return {
         'query': query,
         'context': context,
@@ -101,21 +113,18 @@ class ChatState(TypedDict):
 def chat_node(state: ChatState)->dict:
     messages = state['messages']
     response = llm_with_tools.invoke(messages)
-
     return {'messages': [response]}
 
 tool_node = ToolNode(tools)
 
 graph = StateGraph(ChatState)
-
 graph.add_node('chat_node', chat_node)
 graph.add_node('tools', tool_node)
-
 graph.add_edge(START, 'chat_node')
 graph.add_conditional_edges('chat_node', tools_condition)
 graph.add_edge('tools', 'chat_node')
 
-rag_bot= graph.compile()
+rag_bot = graph.compile()
 
 def main():
     exit_list = ['exit', 'quit', 'thanks', 'thank you']
@@ -127,7 +136,6 @@ def main():
         if user_input.lower() in exit_list:
             print("Goodbye!")
             break
-            
         result = rag_bot.invoke({
             "messages": [
                 SystemMessage(
@@ -139,4 +147,4 @@ def main():
         print(f"AI: {result['messages'][-1].content}\n")
 
 if __name__ == "__main__":
-    main() 
+    main()
