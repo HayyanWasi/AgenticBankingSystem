@@ -19,6 +19,7 @@ dependencies = [
     "langchain-openrouter>=0.1.0",
     "langgraph>=1.0.8",
     "passlib[bcrypt]>=1.7.4",
+    "psycopg2-binary>=2.9.12",
     "pymupdf>=1.27.1",
     "pypdf>=6.7.1",
     "python-dotenv>=1.2.1",
